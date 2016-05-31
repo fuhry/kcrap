@@ -1,0 +1,198 @@
+Kerberos Challenge Response Authentication Protocol [KCRAP]
+Version 0.2.3
+
+Release Notes
+
+========================================================================
+
+
+Notes about this version
+------------------------
+
+This is an initial proof-of-concept quality code.
+It has been tested and verified to work acceptably on my system.
+Some important features are still missing in this program.
+Use at your own risk.
+APIs and network protocols are subject to change.
+See TODO file for list of missing features.
+Supports MIT KRB5 1.4-1.7
+
+
+
+Building and installing KCRAP
+-----------------------------
+
+1) Extract the KCRAP distribution file
+
+2) Run configure:
+   ./configure [arguments]
+
+   Configure arguments of note:
+     --with-server
+         Enable building of KCRAP server (see note on --with-mit-krb5-src)
+     --with-mit-krb5-src=PATH
+         Location of MIT KerberosV source code (recommended when building
+	 server.)  KCRAP will want to use kdb.h from this location in the
+	 server code.  KCRAP also ships with a "stub" version of kdb.h from
+	 MIT Kerberos versions 1.4.4 and 1.6.2.  It will try to determine
+	 the correct version to use, but you should specify the correct
+	 path of kdb.h from your Kerberos build in order to ensure
+	 compatibility.
+
+   IMPORTANT:
+	KCRAP server will not be built unless it finds a usable kdb.h.
+	You mist specify either --with-mit-krb5-src=PATH to use the one
+	shipped with your KerberosV version, or use --with-server without
+	specifying --with-mit-krb5-src=PATH if you want to use the one
+	shipped with KCRAP.
+
+3) Build KCRAP:
+   make all
+
+4) Install KCRAP:
+   make install
+
+
+
+Configuring KCRAP Server
+------------------------
+
+KCRAP server requires a configuration file to run.  A sample configuration
+file is included in server/kcrap_server.conf.  Its syntax is similar to
+the kdc configuration.
+
+Example:
+
+[kcrap_server]
+	# port (required) specifies the port KCRAP listens on
+	port = 89
+
+	# realm (required) specifies the realm used for communication
+	# security and authentication
+	# only one realm is currently supported
+	realm = EXAMPLE.COM
+
+# realm specification (optional) is similar to that of kdc.conf.
+
+[realms]
+	EXAMPLE.COM = {
+		database_name = /var/krb5kdc/EXAMPLE.COM/principal
+		key_stash_file = /var/krb5kdc/EXAMPLE.COM/.k5.EXAMPLE.COM
+	}
+
+IMPORTANT:
+	In order to authenticate with the NTLM family of challenge response
+	protocols, you must have NTLM password hashes stored in your
+	Kerberos database.  Make sure you have "arcfour-hmac:normal"
+	specified specified as a supported encryption type in your kdc.conf.
+	Your users will also need to change their password after you
+	have added any encryption types.
+	
+
+
+Configuring KCRAP Library
+-------------------------
+
+You must specify the KCRAP server for each realm in your krb5.conf file.
+For each KCRAP server, put a line in your krb5.conf file under the correct
+realm:
+	kcrap = kdc.example.com:89
+
+Example:
+
+[realms]
+	EXAMPLE.COM = {
+		kdc = kdc1.example.com:88
+		kcrap = kdc1.example.com:89
+		kdc = kdc2.example.com:88
+		kcrap = kdc2.example.com:89
+		kdc = kdc3.example.com:88
+		kcrap = kdc3.example.com:89
+		admin_server = kdc1.example.com:749
+		default_domain = example.com
+	}
+
+
+
+Testing your KCRAP setup
+------------------------
+
+KCRAP ships with test clients for each challenge/response protocol that it
+supports.  To test:
+
+1) Create in your Kerberos database a test account:
+	USERNAME: user
+	PASSWORD: SecREt01
+
+2) Run each test in the test directory.  Tests should respond with the
+   output: "Authentication OK"
+
+3) Probably a good idea to delete your test account now.
+
+
+Getting your services to work with KCRAP
+----------------------------------------
+
+Patches to get KCRAP working with some programs can be found at:
+	http://www.spock.org/kcrap/
+
+The C API for KCRAP is fairly simple:
+
+1) Obtain KCRAP context:
+	struct kcrap_context *kcontext =kcrap_init(char* keytab, char* service);
+
+	Arguments:
+		keytab: location of keytab file, or NULL for default
+		service: service name of principal, or NULL for "host"
+
+	Returns:
+		kcrap_context, or NULL on error.  errno is set on error.
+
+2) Fill out request structure
+	struct kcrap_auth_req_data req;
+	bzero(req, sizeof(req));
+	req.chal_type.data = "NTLM"
+	req.chal_type.length = 4;
+	[...]
+   There is no need to fill out pkt_type
+   timestamp and nonce will be filled automatically if they are 0.
+
+   For NTLM:
+	alt_username is not used
+	either server_challenge or client_challenge contains the challenge
+	response contains the NTLM response
+
+   For NTLM2:
+	alt_username is the NT domain name
+	server_challenge is the (8-byte) server generated challenge
+	client_challenge is the client generated blob
+	response contains the 16-byte MD5 hash response
+
+   For NTLM2S:
+	alt_username is not used
+	server_challenge is the (8-byte) server generated challenge
+	client_challenge is the (8-byte) client generated blob
+	response contains the 24-byte response
+
+3) Request authentication
+	int retval = kcrap_try((struct kcrap_context *kcontext, struct kcrap_auth_req_data *req, int *auth_status);
+
+	Arguments:
+		kcontext: context from kcrap_init
+		req: request structure
+		auth_status: status of authentication (bitwise OR):
+			0 - failed
+			KCRAP_AUTH_OK - authentication successful
+			KCRAP_AUTH_COOKIE_OK - server_challenge_cookie check OK
+
+	Returns:
+		0 if no error, or errno.
+
+4) Destroy context
+	kcrap_free(struct kcrap_context *kcontext);
+
+a) Error messages:
+	kcrap_errmsg() will return the latest error message.
+
+
+

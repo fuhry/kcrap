@@ -1,0 +1,16 @@
+Missing features
+----------------
+
+- Check Kerberos ACLs
+
+- Server generated and authenticated challenges
+
+- Check timestamp in requests
+
+- Replay detection
+
+- Multiple realm / cross realm support
+
+- Verify usability with LDAP backend
+
+- Make thread safe

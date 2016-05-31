@@ -1,0 +1,50 @@
+PREFIX=@prefix@
+
+CC=@CC@
+CFLAGS=-I../lib @CFLAGS@
+LDFLAGS=@LDFLAGS@
+EXTRA_LIBS=@LIBS@
+LIBS=-lkrb5 -lk5crypto -lcom_err -lkdb5 -lcrypto $(EXTRA_LIBS)
+
+INSTALL=@INSTALL@
+
+
+OBJS=kcrap_server.o modules.o kcrap_kdb.o util.o modules/ntlm.o modules/ntlmv2.o modules/ntlmv2s.o
+
+all: kcrap_server
+
+.c.o:
+	$(CC) -c -o $@ $(CFLAGS) $<
+
+kcrap_server: $(OBJS)
+	$(CC) -o $@ $(OBJS) $(LDFLAGS) $(LIBS)
+
+install: kcrap_server
+	mkdir -p $(DESTDIR)$(PREFIX)/sbin
+	$(INSTALL) kcrap_server $(DESTDIR)$(PREFIX)/sbin/
+
+clean:
+	rm -f $(OBJS) *.o *~ modules/*~ kcrap_server modules_list.h
+
+distclean: clean
+	rm -f Makefile
+
+
+
+modules_list.h:
+	for a in modules/*.c; do \
+	  name="`basename $$a | sed 's/\.c$$//'`" ;\
+	  modules="$$modules $$name" ;\
+	done ;\
+	rm -f modules_list.h ;\
+	for a in $$modules; do \
+	  echo "extern struct kcrap_module $${a}_module;" >> modules_list.h ;\
+	done ;\
+	echo "static struct kcrap_module* kcrap_modules[] = {" >> modules_list.h ;\
+	for a in $$modules; do \
+	  echo "    &$${a}_module," >> modules_list.h ;\
+	done ;\
+	echo "    NULL" >> modules_list.h ;\
+	echo "};" >> modules_list.h
+
+modules.o: modules_list.h

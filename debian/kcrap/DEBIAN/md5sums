@@ -1,0 +1,9 @@
+9a54f7c940c5e962f8fca2530fac4fd1  lib/systemd/system/kcrap.service
+2d68c56addea8b391dd06bd7b701f48c  usr/bin/kcrapclient
+c1641be644ab024305471cb069441fe0  usr/include/kcrap.h
+d416e20f159c862d7d37c540cda26c89  usr/lib/libkcrap.a
+aee32c86d6dcc41daa92177f546346ad  usr/lib/libkcrap.so.0
+6fe2a94fcbdaef466158f84784b4b49d  usr/sbin/kcrap_server
+73662d6241a52b63a6acdf59fb3c5fb6  usr/share/doc/kcrap/README.Debian
+82d2ba1cda764704f468ab14b77d03e8  usr/share/doc/kcrap/changelog.Debian.gz
+c3eade8b9a5159345c231644d6f60c87  usr/share/doc/kcrap/copyright

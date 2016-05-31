@@ -1,0 +1,17 @@
+SUBDIR=@SUBDIR@
+
+default: all
+
+all install clean:
+	@$(MAKE) TARGET=$@ $(SUBDIR)
+
+distclean:
+	@$(MAKE) TARGET=distclean $(SUBDIR)
+	rm -rf autom4te.cache
+	rm -f *~ config.h Makefile config.cache config.status config.log
+
+@SUBDIR@: FORCE
+	@echo "Making $(TARGET) in $@"
+	@(cd $@ && $(MAKE) $(TARGET))
+
+FORCE:

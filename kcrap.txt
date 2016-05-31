@@ -1,0 +1,26 @@
+Message:
+	type=AUTH_REQ
+	AP_REQ
+	ENC[
+		struct kcrap_auth_req_data
+	]
+	
+
+Message:
+	type=AUTH_REP
+	ENC[
+		struct kcrap_auth_rep_data
+	]
+
+Message:
+	type=CHAL_REQ
+	AP_REQ
+	ENC[
+		struct kcrap_chal_req_data
+	]
+
+Message:
+	type=CHAL_REP
+	ENC[
+		struct kcrap_chal_rep_data
+	ENC]

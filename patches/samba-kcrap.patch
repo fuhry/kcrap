@@ -1,0 +1,676 @@
+--- samba-3.0.26a/source/configure.in~	2007-12-07 14:48:00.000000000 -0500
++++ samba-3.0.26a/source/configure.in	2007-12-07 15:12:50.000000000 -0500
+@@ -4296,6 +4296,50 @@
+ )
+ 
+ 
++#################################################
++# check for KCRAP support
++AC_MSG_CHECKING(whether to use auth_kcrap)
++AC_ARG_WITH(kcrap,
++[  --with-kcrap={yes/static|module|no}      Build KCRAP module for authenticating NTLM against Kerberos password database (default=auto)],
++[ case "$withval" in
++  yes|static)
++    AC_MSG_RESULT(static)
++    AC_CHECK_HEADER(kcrap.h)
++    AC_CHECK_LIB(kcrap, kcrap_try)
++    default_static_modules="$default_static_modules auth_kcrap"
++    LIBS="$LIBS -lkcrap"
++  ;;
++  module)
++    AC_MSG_RESULT(module)
++    AC_CHECK_HEADER(kcrap.h)
++    AC_CHECK_LIB(kcrap, kcrap_try)
++    default_shared_modules="$default_shared_modules auth_kcrap"
++  ;;
++  no)
++    AC_MSG_RESULT(no)
++  ;;
++  *)
++    AC_CHECK_HEADER(kcrap.h,[
++      AC_CHECK_LIB(kcrap, kcrap_try, [
++       AC_MSG_RESULT(yes)
++	default_static_modules="$default_static_modules auth_kcrap"
++	LIBS="$LIBS -lkcrap"
++      ], [ AC_MSG_RESULT(no library) ])
++    ], [ AC_MSG_RESULT(no header) ])
++    
++  ;;
++  esac ], [
++    AC_CHECK_HEADER(kcrap.h,[
++      AC_CHECK_LIB(kcrap, kcrap_try, [
++       AC_MSG_RESULT(yes)
++	default_static_modules="$default_static_modules auth_kcrap"
++	LIBS="$LIBS -lkcrap"
++      ], [ AC_MSG_RESULT(no library) ])
++    ], [ AC_MSG_RESULT(no header) ])
++  ],
++)
++
++
+ ###############################################
+ # test for where we get crypt() from
+ AC_SEARCH_LIBS(crypt, [crypt],
+@@ -6081,6 +6117,7 @@
+ SMB_MODULE(auth_domain, \$(AUTH_DOMAIN_OBJ), "bin/domain.$SHLIBEXT", AUTH)
+ SMB_MODULE(auth_builtin, \$(AUTH_BUILTIN_OBJ), "bin/builtin.$SHLIBEXT", AUTH)
+ SMB_MODULE(auth_script, \$(AUTH_SCRIPT_OBJ), "bin/script.$SHLIBEXT", AUTH)
++SMB_MODULE(auth_kcrap, \$(AUTH_KCRAP_OBJ), "bin/kcrap.$SHLIBEXT", AUTH)
+ SMB_SUBSYSTEM(AUTH,auth/auth.o)
+ 
+ SMB_MODULE(vfs_default, \$(VFS_DEFAULT_OBJ), "bin/default.$SHLIBEXT", VFS)
+--- samba-3.0.26a/source/Makefile.in~	2007-12-07 14:49:35.000000000 -0500
++++ samba-3.0.26a/source/Makefile.in	2007-12-07 15:13:40.000000000 -0500
+@@ -446,6 +446,7 @@
+ AUTH_UNIX_OBJ = auth/auth_unix.o
+ AUTH_WINBIND_OBJ = auth/auth_winbind.o
+ AUTH_SCRIPT_OBJ = auth/auth_script.o
++AUTH_KCRAP_OBJ = auth/auth_kcrap.o
+ 
+ AUTH_OBJ = auth/auth.o @AUTH_STATIC@ auth/auth_util.o auth/auth_compat.o \
+ 	   auth/auth_ntlmssp.o \
+@@ -1314,6 +1315,10 @@
+ 	@echo "Building plugin $@"
+ 	@$(SHLD) $(LDSHFLAGS) -o $@ $(AUTH_SCRIPT_OBJ) @SONAMEFLAG@`basename $@`
+ 
++bin/kcrap.@SHLIBEXT@: proto_exists $(AUTH_KCRAP_OBJ)
++	@echo "Building plugin $@"
++	@$(SHLD) $(LDSHFLAGS) -o $@ $(AUTH_KCRAP_OBJ) @SONAMEFLAG@`basename $@` -lkcrap
++
+ bin/smbserver.@SHLIBEXT@: proto_exists $(AUTH_SERVER_OBJ)
+ 	@echo "Building plugin $@"
+ 	@$(SHLD) $(LDSHFLAGS) -o $@ $(AUTH_SERVER_OBJ) @SONAMEFLAG@`basename $@`
+--- /dev/null	2007-12-07 15:11:00.000000000 -0500
++++ samba-3.0.26a/source/auth/auth_kcrap.c	2007-12-07 14:21:52.000000000 -0500
+@@ -0,0 +1,591 @@
++/* 
++*/
++
++#include "includes.h"
++#undef AP_OPTS_USE_SUBKEY
++#include <krb5.h>
++#include <profile.h>
++#include <kcrap.h>
++
++#undef malloc
++
++#undef DBGC_CLASS
++#define DBGC_CLASS DBGC_AUTH
++
++#define KCRAP_SDATA(VAR,VAL) (VAR).data = (VAL), (VAR).length = strlen((VAR).data)
++
++struct kcrap_priv_data {
++    struct kcrap_context *context;
++    char* keytab_file;
++};
++
++/****************************************************************************
++ Check if a user is allowed to logon at this time. Note this is the
++ servers local time, as logon hours are just specified as a weekly
++ bitmask.
++****************************************************************************/
++                                                                                                              
++static BOOL logon_hours_ok(struct samu *sampass)
++{
++	/* In logon hours first bit is Sunday from 12AM to 1AM */
++	const uint8 *hours;
++	struct tm *utctime;
++	time_t lasttime;
++	const char *asct;
++	uint8 bitmask, bitpos;
++
++	hours = pdb_get_hours(sampass);
++	if (!hours) {
++		DEBUG(5,("logon_hours_ok: No hours restrictions for user %s\n",pdb_get_username(sampass)));
++		return True;
++	}
++
++	lasttime = time(NULL);
++	utctime = gmtime(&lasttime);
++	if (!utctime) {
++		DEBUG(1, ("logon_hours_ok: failed to get gmtime. Failing logon for user %s\n",
++			pdb_get_username(sampass) ));
++		return False;
++	}
++
++	/* find the corresponding byte and bit */
++	bitpos = (utctime->tm_wday * 24 + utctime->tm_hour) % 168;
++	bitmask = 1 << (bitpos % 8);
++
++	if (! (hours[bitpos/8] & bitmask)) {
++		struct tm *t = localtime(&lasttime);
++		if (!t) {
++			asct = "INVALID TIME";
++		} else {
++			asct = asctime(t);
++			if (!asct) {
++				asct = "INVALID TIME";
++			}
++		}
++		
++		DEBUG(1, ("logon_hours_ok: Account for user %s not allowed to "
++			  "logon at this time (%s).\n",
++			  pdb_get_username(sampass), asct ));
++		return False;
++	}
++
++	asct = asctime(utctime);
++	DEBUG(5,("logon_hours_ok: user %s allowed to logon at this time (%s)\n",
++		pdb_get_username(sampass), asct ? asct : "UNKNOWN TIME" ));
++
++	return True;
++}
++
++
++/****************************************************************************
++ Do a specific test for a struct samu being vaild for this connection 
++ (ie not disabled, expired and the like).
++****************************************************************************/
++
++static NTSTATUS kcrap_account_ok(TALLOC_CTX *mem_ctx,
++			       struct samu *sampass, 
++			       const auth_usersupplied_info *user_info) {
++    uint32 acct_ctrl = pdb_get_acct_ctrl(sampass);
++    char *workstation_list;
++    time_t kickoff_time;
++	
++    DEBUG(4,("kcrap_account_ok: Checking SMB password for user %s\n",pdb_get_username(sampass)));
++
++    /* Quit if the account was disabled. */
++    if (acct_ctrl & ACB_DISABLED) {
++	DEBUG(1,("kcrap_account_ok: Account for user '%s' was disabled.\n", pdb_get_username(sampass)));
++	return NT_STATUS_ACCOUNT_DISABLED;
++    }
++
++    /* Quit if the account was locked out. */
++    if (acct_ctrl & ACB_AUTOLOCK) {
++	DEBUG(1,("kcrap_account_ok: Account for user %s was locked out.\n", pdb_get_username(sampass)));
++	return NT_STATUS_ACCOUNT_LOCKED_OUT;
++    }
++
++    /* Quit if the account is not allowed to logon at this time. */
++    if (! logon_hours_ok(sampass)) {
++	return NT_STATUS_INVALID_LOGON_HOURS;
++    }
++
++    /* Test account expire time */
++	
++    kickoff_time = pdb_get_kickoff_time(sampass);
++    if (kickoff_time != 0 && time(NULL) > kickoff_time) {
++	DEBUG(1,("kcrap_account_ok: Account for user '%s' has expired.\n", pdb_get_username(sampass)));
++	DEBUG(3,("kcrap_account_ok: Account expired at '%ld' unix time.\n", (long)kickoff_time));
++	return NT_STATUS_ACCOUNT_EXPIRED;
++    }
++
++    /* Test workstation. Workstation list is comma separated. */
++
++    workstation_list = talloc_strdup(mem_ctx, pdb_get_workstations(sampass));
++    if (!workstation_list)
++	return NT_STATUS_NO_MEMORY;
++
++    if (*workstation_list) {
++	BOOL invalid_ws = True;
++	fstring tok;
++	const char *s = workstation_list;
++
++	const char *machine_name = talloc_asprintf(mem_ctx, "%s$", user_info->wksta_name);
++	if (machine_name == NULL)
++	    return NT_STATUS_NO_MEMORY;
++
++	while (next_token(&s, tok, ",", sizeof(tok))) {
++	    DEBUG(10,("kcrap_account_ok: checking for workstation match %s and %s\n",
++		      tok, user_info->wksta_name));
++	    if(strequal(tok, user_info->wksta_name)) {
++		invalid_ws = False;
++		break;
++	    }
++	    if (tok[0] == '+') {
++		DEBUG(10,("kcrap_account_ok: checking for workstation %s in group: %s\n", 
++			  machine_name, tok + 1));
++		if (user_in_group(machine_name, tok + 1)) {
++		    invalid_ws = False;
++		    break;
++		}
++	    }
++	}
++
++	if (invalid_ws) 
++	    return NT_STATUS_INVALID_WORKSTATION;
++    }
++
++    if (acct_ctrl & ACB_DOMTRUST) {
++	DEBUG(2,("kcrap_account_ok: Domain trust account %s denied by server\n", pdb_get_username(sampass)));
++	return NT_STATUS_NOLOGON_INTERDOMAIN_TRUST_ACCOUNT;
++    }
++	
++    if (acct_ctrl & ACB_SVRTRUST) {
++	if (!(user_info->logon_parameters & MSV1_0_ALLOW_SERVER_TRUST_ACCOUNT)) {
++	    DEBUG(2,("kcrap_account_ok: Server trust account %s denied by server\n", pdb_get_username(sampass)));
++	    return NT_STATUS_NOLOGON_SERVER_TRUST_ACCOUNT;
++	}
++    }
++
++    if (acct_ctrl & ACB_WSTRUST) {
++	if (!(user_info->logon_parameters & MSV1_0_ALLOW_WORKSTATION_TRUST_ACCOUNT)) {
++	    DEBUG(2,("kcrap_account_ok: Wksta trust account %s denied by server\n", pdb_get_username(sampass)));
++	    return NT_STATUS_NOLOGON_WORKSTATION_TRUST_ACCOUNT;
++	}
++    }
++    return NT_STATUS_OK;
++}
++
++static NTSTATUS check_kcrap_password(const struct auth_context *auth_context,
++				    void *my_private_data, 
++				    TALLOC_CTX *mem_ctx,
++				    const auth_usersupplied_info *user_info) {
++    static const unsigned char zeros[24] = { 0, };
++    struct kcrap_priv_data* priv = my_private_data;
++    struct kcrap_auth_req_data req;
++    int ret;
++    char *updomain;
++    int auth_status;
++
++    if (priv->context == NULL)
++	priv->context = kcrap_init(priv->keytab_file, NULL);
++    if (priv->context == NULL) {
++	DEBUG(1,("check_kcrap_password: KCRAP initialize Internal Error - %s\n", kcrap_errmsg()));
++	return NT_STATUS_INTERNAL_ERROR;
++    }
++
++    bzero(&req, sizeof(req));
++    
++    if (user_info->nt_interactive_pwd.length) {
++	uchar chal[8];
++	uchar p24[24];
++
++	if (user_info->nt_interactive_pwd.length != 16) {
++	    DEBUG(3,("check_kcrap_password: Interactive logon: Invalid NT password length (%d) supplied for user %s\n", (int)user_info->nt_interactive_pwd.length,
++		     user_info->smb_name));
++	    return NT_STATUS_INVALID_PARAMETER;
++	}
++
++	generate_random_buffer(chal, sizeof(chal));
++	SMBOWFencrypt(user_info->nt_interactive_pwd.data, chal, p24);
++
++	KCRAP_SDATA(req.chal_type, "NTLM");
++	KCRAP_SDATA(req.principal, user_info->smb_name);
++	req.server_challenge.length = 8;
++	req.server_challenge.data = chal;
++	req.response.length = 24;
++	req.response.data = p24;
++
++	ret = kcrap_try(priv->context, &req, &auth_status);
++	if (ret != 0) {
++	    DEBUG(1,("check_kcrap_password: KCRAP NTLM (Interactive) Internal Error for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    return NT_STATUS_INTERNAL_ERROR;
++	} else if (auth_status == 0) {
++	    DEBUG(3,("check_kcrap_password: NTLM (Interactive) password check failed for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    return NT_STATUS_WRONG_PASSWORD;
++	} else {
++	    return NT_STATUS_OK;
++	}
++	/* NOTREACHED */
++    }
++
++    /* Check for cleartext netlogon. Used by Exchange 5.5. */
++    if (auth_context->challenge.length == 8 && 
++	(memcmp(auth_context->challenge.data, zeros, auth_context->challenge.length) == 0 )) {
++
++	DEBUG(4,("check_kcrap_password: checking plaintext passwords for user %s\n",
++		 user_info->smb_name));
++	if (user_info->nt_resp.length) {
++	    uchar chal[8];
++	    uchar p24[24];
++	    unsigned char pwhash[16];
++	    mdfour(pwhash, user_info->nt_resp.data, user_info->nt_resp.length);
++
++	    generate_random_buffer(chal, sizeof(chal));
++	    SMBOWFencrypt(pwhash, chal, p24);
++
++	    KCRAP_SDATA(req.chal_type, "NTLM");
++	    KCRAP_SDATA(req.principal, user_info->smb_name);
++	    req.server_challenge.length = 8;
++	    req.server_challenge.data = chal;
++	    req.response.length = 24;
++	    req.response.data = p24;
++
++	    ret = kcrap_try(priv->context, &req, &auth_status);
++	    if (ret != 0) {
++		DEBUG(1,("check_kcrap_password: KCRAP NTLM (PLAIN) Internal Error for user %s - %s\n",
++			 user_info->smb_name, kcrap_errmsg()));
++		return NT_STATUS_INTERNAL_ERROR;
++	    } else if (auth_status == 0) {
++		DEBUG(3,("check_kcrap_password: NTLM (PLAIN) password check failed for user %s - %s\n",
++			 user_info->smb_name, kcrap_errmsg()));
++		return NT_STATUS_WRONG_PASSWORD;
++	    } else {
++		return NT_STATUS_OK;
++	    }
++	} else {
++	    return NT_STATUS_NOT_IMPLEMENTED;
++	}
++	/* NOTREACHED */
++    }
++
++    if (user_info->nt_resp.length > 24) {
++	DEBUG(4,("check_kcrap_password: Checking NTLMv2 password with domain [%s]\n", user_info->client_domain));
++	KCRAP_SDATA(req.chal_type, "NTLM2");
++	KCRAP_SDATA(req.principal, user_info->smb_name);
++	req.server_challenge.length = auth_context->challenge.length;
++	req.server_challenge.data = auth_context->challenge.data;
++	req.client_challenge.length = user_info->nt_resp.length-16;
++	req.client_challenge.data = user_info->nt_resp.data+16;
++	req.response.length = 16;
++	req.response.data = user_info->nt_resp.data;
++	KCRAP_SDATA(req.alt_username, user_info->client_domain);
++
++	ret = kcrap_try(priv->context, &req, &auth_status);
++	if (ret != 0) {
++	    DEBUG(1,("check_kcrap_password: KCRAP NTLMv2 Internal Error for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    return NT_STATUS_INTERNAL_ERROR;
++	} else if (auth_status > 0) {
++	    return NT_STATUS_OK;
++	}
++
++	DEBUG(4,("check_kcrap_password: Checking NTLMv2 password with uppercased version of domain [%s]\n", user_info->client_domain));
++	updomain = malloc(strlen(user_info->client_domain)+1);
++	if (updomain) {
++	    int i;
++	    for (i = 0; i < strlen(user_info->client_domain); i++)
++		updomain[i] = toupper(user_info->client_domain[i]);
++	    updomain[i] = 0;
++	}
++	req.alt_username.data = updomain;
++	    
++	ret = kcrap_try(priv->context, &req, &auth_status);
++	if (ret != 0) {
++	    DEBUG(1,("check_kcrap_password: KCRAP NTLMv2 Internal Error for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    free(updomain);
++	    return NT_STATUS_INTERNAL_ERROR;
++	} else if (auth_status > 0) {
++	    free(updomain);
++	    return NT_STATUS_OK;
++	}
++	free(updomain);
++
++	req.alt_username.data = NULL;
++	req.alt_username.length = 0;
++
++	DEBUG(4,("check_kcrap_password: Checking NTLMv2 password without a domain\n"));
++	ret = kcrap_try(priv->context, &req, &auth_status);
++	if (ret != 0) {
++	    DEBUG(1,("check_kcrap_password: KCRAP NTLMv2 Internal Error for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    return NT_STATUS_INTERNAL_ERROR;
++	} else if (auth_status == 0) {
++	    DEBUG(3,("check_kcrap_password: NTLMv2 password check failed for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    return NT_STATUS_WRONG_PASSWORD;
++	} else {
++	    return NT_STATUS_OK;
++	}
++	/* NOTREACHED */
++    }
++
++    if (user_info->nt_resp.length == 24 && lp_ntlm_auth()) {
++	DEBUG(4,("check_kcrap_password: Checking NT MD4 password\n"));
++	KCRAP_SDATA(req.chal_type, "NTLM");
++	KCRAP_SDATA(req.principal, user_info->smb_name);
++	req.server_challenge.length = auth_context->challenge.length;
++	req.server_challenge.data = auth_context->challenge.data;
++	req.response.length = 24;
++	req.response.data = user_info->nt_resp.data;
++
++	ret = kcrap_try(priv->context, &req, &auth_status);
++	if (ret != 0) {
++	    DEBUG(1,("check_kcrap_password: KCRAP NTLM Internal Error for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    return NT_STATUS_INTERNAL_ERROR;
++	} else if (auth_status == 0) {
++	    DEBUG(3,("check_kcrap_password: NTLM password check failed for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    return NT_STATUS_WRONG_PASSWORD;
++	} else {
++	    return NT_STATUS_OK;
++	}
++	/* NOTREACHED */
++    }
++
++    if (user_info->lm_resp.length < 24) {
++	DEBUG(3,("check_kcrap_password:: NEITHER LanMan nor NT password supplied for user %s\n",
++		 user_info->smb_name));
++	return NT_STATUS_NOT_IMPLEMENTED;
++    }
++
++    if (memcmp(user_info->lm_resp.data+8, zeros, 16) == 0) {
++	DEBUG(4,("check_kcrap_password: Checking LMv2 password with domain [%s]\n", user_info->client_domain));
++	KCRAP_SDATA(req.chal_type, "NTLM2S");
++	KCRAP_SDATA(req.principal, user_info->smb_name);
++	req.server_challenge.length = auth_context->challenge.length;
++	req.server_challenge.data = auth_context->challenge.data;
++	req.client_challenge.length = 8;
++	req.client_challenge.data = user_info->lm_resp.data;
++	req.response.length = user_info->nt_resp.length;
++	req.response.data = user_info->nt_resp.data;
++	KCRAP_SDATA(req.alt_username, user_info->client_domain);
++
++	ret = kcrap_try(priv->context, &req, &auth_status);
++	if (ret != 0) {
++	    DEBUG(1,("check_kcrap_password: KCRAP LMv2 Internal Error for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    return NT_STATUS_INTERNAL_ERROR;
++	} else if (auth_status > 0) {
++	    return NT_STATUS_OK;
++	}
++
++
++	DEBUG(4,("check_kcrap_password: Checking LMv2 password with uppercased version of domain [%s]\n", user_info->client_domain));
++	updomain = malloc(strlen(user_info->client_domain)+1);
++	if (updomain) {
++	    int i;
++	    for (i = 0; i < strlen(user_info->client_domain); i++)
++		updomain[i] = toupper(user_info->client_domain[i]);
++	    updomain[i] = 0;
++	}
++	req.alt_username.data = updomain;
++
++	ret = kcrap_try(priv->context, &req, &auth_status);
++	if (ret != 0) {
++	    DEBUG(1,("check_kcrap_password: KCRAP LMv2 Internal Error for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    free(updomain);
++	    return NT_STATUS_INTERNAL_ERROR;
++	} else if (auth_status > 0) {
++	    free(updomain);
++	    return NT_STATUS_OK;
++	}
++	free(updomain);
++
++	req.alt_username.data = NULL;
++	req.alt_username.length = 0;
++
++	DEBUG(4,("check_kcrap_password: Checking LMv2 password without a domain\n"));
++	ret = kcrap_try(priv->context, &req, &auth_status);
++	if (ret != 0) {
++	    DEBUG(1,("check_kcrap_password: KCRAP LMv2 Internal Error for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    return NT_STATUS_INTERNAL_ERROR;
++	} else if (auth_status == 0) {
++	    DEBUG(3,("check_kcrap_password: LMv2 password check failed for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    return NT_STATUS_WRONG_PASSWORD;
++	} else {
++	    return NT_STATUS_OK;
++	}
++	/* NOTREACHED */
++    }
++    
++    if (lp_ntlm_auth()) {
++	DEBUG(4,("check_kcrap_password: Checking NT MD4 password in LM field\n"));
++	KCRAP_SDATA(req.chal_type, "NTLM");
++	KCRAP_SDATA(req.principal, user_info->smb_name);
++	req.server_challenge.length = auth_context->challenge.length;
++	req.server_challenge.data = auth_context->challenge.data;
++	req.response.length = 24;
++	req.response.data = user_info->nt_resp.data;
++
++	ret = kcrap_try(priv->context, &req, &auth_status);
++	if (ret != 0) {
++	    DEBUG(1,("check_kcrap_password: KCRAP NTLM Internal Error for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    return NT_STATUS_INTERNAL_ERROR;
++	} else if (auth_status == 0) {
++	    DEBUG(3,("check_kcrap_password: NTLM password check failed for user %s - %s\n",
++		     user_info->smb_name, kcrap_errmsg()));
++	    return NT_STATUS_WRONG_PASSWORD;
++	} else {
++	    return NT_STATUS_OK;
++	}
++	/* NOTREACHED */
++    }
++    
++    DEBUG(4,("check_kcrap_password: No appropiate authentication\n"));
++    return NT_STATUS_NOT_IMPLEMENTED;
++}
++
++static NTSTATUS check_kcrap_security(const struct auth_context *auth_context,
++				    void *my_private_data, 
++				    TALLOC_CTX *mem_ctx,
++				    const auth_usersupplied_info *user_info, 
++				    auth_serversupplied_info **server_info) {
++    struct samu *sampass=NULL;
++    int ret;
++    NTSTATUS nt_status, retstat;
++    BOOL updated_autolock = False, updated_badpw = False;
++
++    if (!user_info) {
++	return NT_STATUS_INVALID_PARAMETER;
++    }
++    
++    if (!auth_context) {
++	DEBUG(3,("script_check_user_credentials: no auth_info !\n"));
++	return NT_STATUS_INVALID_PARAMETER;
++    }		
++
++    /* Can't use the talloc version here, because the returned struct gets
++     kept on the server_info */
++
++    if ( !(sampass = samu_new( NULL )) ) {
++	return NT_STATUS_NO_MEMORY;
++    }
++
++    /* get the account information */
++
++    become_root();
++    ret = pdb_getsampwnam(sampass, user_info->internal_username);
++    unbecome_root();
++
++    if (ret == False) {
++	DEBUG(3,("check_kcrap_security: Couldn't find user '%s' in passdb.\n", user_info->internal_username));
++	TALLOC_FREE(sampass);
++	return NT_STATUS_NO_SUCH_USER;
++    }
++
++    /* see if autolock flag needs to be updated */
++    if (pdb_get_acct_ctrl(sampass) & ACB_NORMAL)
++	pdb_update_autolock_flag(sampass, &updated_autolock);
++    /* Quit if the account was locked out. */
++    if (pdb_get_acct_ctrl(sampass) & ACB_AUTOLOCK) {
++	DEBUG(3,("check_kcrap_security: Account for user %s was locked out.\n", pdb_get_username(sampass)));
++	return NT_STATUS_ACCOUNT_LOCKED_OUT;
++    }
++
++    nt_status = check_kcrap_password(auth_context, my_private_data, mem_ctx, user_info);
++
++    /* Notify passdb backend of login success/failure. If not NT_STATUS_OK the backend doesn't like the login */
++    retstat = pdb_update_login_attempts(sampass, NT_STATUS_IS_OK(nt_status));
++    if (!NT_STATUS_IS_OK(retstat))
++	nt_status = retstat;
++
++    if (!NT_STATUS_IS_OK(nt_status)) {
++	if (NT_STATUS_EQUAL(nt_status, NT_STATUS_WRONG_PASSWORD) && pdb_get_acct_ctrl(sampass) & ACB_NORMAL) {
++	    pdb_increment_bad_password_count(sampass);
++	    updated_badpw = True;
++	} else {
++	    pdb_update_bad_password_count(sampass, &updated_badpw);
++	}
++	if (updated_autolock || updated_badpw) {
++	    become_root();
++	    if(!NT_STATUS_IS_OK(pdb_update_sam_account(sampass)))
++		DEBUG(1, ("Failed to modify entry.\n"));
++	    unbecome_root();
++	}
++	TALLOC_FREE(sampass);
++	return nt_status;
++    }
++
++    if ((pdb_get_acct_ctrl(sampass) & ACB_NORMAL) && (pdb_get_bad_password_count(sampass) > 0)){
++	pdb_set_bad_password_count(sampass, 0, PDB_CHANGED);
++	pdb_set_bad_password_time(sampass, 0, PDB_CHANGED);
++	updated_badpw = True;
++    }
++
++    if (updated_autolock || updated_badpw){
++	become_root();
++	if(!NT_STATUS_IS_OK(pdb_update_sam_account(sampass)))
++	    DEBUG(1, ("Failed to modify entry.\n"));
++	unbecome_root();
++    }
++
++    nt_status = kcrap_account_ok(mem_ctx, sampass, user_info);
++
++    if (!NT_STATUS_IS_OK(nt_status)) {
++	TALLOC_FREE(sampass);
++	return nt_status;
++    }
++
++    become_root();
++    nt_status = make_server_info_sam(server_info, sampass);
++    unbecome_root();
++
++    if (!NT_STATUS_IS_OK(nt_status)) {
++	DEBUG(0,("check_kcrap_security: make_server_info_sam() failed with '%s'\n", nt_errstr(nt_status)));
++	TALLOC_FREE(sampass);
++	return nt_status;
++    }
++
++    (*server_info)->was_mapped |= user_info->was_mapped;
++
++    return nt_status;
++}
++
++static void kcrap_free_private(void** private_data) {
++    struct kcrap_priv_data* priv = *private_data;
++    
++    kcrap_free(priv->context);
++    if (priv->keytab_file) free(priv->keytab_file);
++    free(priv);
++}
++
++/* module initialisation */
++static NTSTATUS auth_init_kcrap(struct auth_context *auth_context, const char *param, auth_methods **auth_method) {
++    if (!make_auth_methods(auth_context, auth_method)) {
++	return NT_STATUS_NO_MEMORY;
++    }
++
++    (*auth_method)->name = "kcrap";
++    (*auth_method)->auth = check_kcrap_security;
++    (*auth_method)->private_data = calloc(1, sizeof(struct kcrap_priv_data));
++    if ((*auth_method)->private_data == NULL) {
++	return NT_STATUS_NO_MEMORY;
++    }
++    if (param) {
++	((struct kcrap_priv_data*)((*auth_method)->private_data))->keytab_file = strdup(param);
++    }
++    (*auth_method)->free_private_data = kcrap_free_private;
++    return NT_STATUS_OK;
++}
++
++NTSTATUS auth_kcrap_init(void)
++{
++    return smb_register_auth(AUTH_INTERFACE_VERSION, "kcrap", auth_init_kcrap);
++}

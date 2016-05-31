@@ -1,0 +1,3 @@
+misc:Depends=init-system-helpers (>= 1.18~)
+shlibs:Depends=libc6 (>= 2.14), libcomerr2 (>= 1.01), libk5crypto3 (>= 1.6.dfsg.2), libkdb5-8, libkrb5-3 (>= 1.13~alpha1+dfsg), libssl1.0.0 (>= 1.0.0)
+misc:Pre-Depends=

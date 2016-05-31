@@ -1,0 +1,25 @@
+CC=@CC@
+CFLAGS=-I../lib @CFLAGS@
+LDFLAGS=-L../lib @LDFLAGS@
+LIBS=-lkcrap
+
+SRCS=kcraptest.c
+
+all: test-ntlm test-ntlmv2 test-ntlmv2s
+
+test-ntlm: $(SRCS)
+	$(CC) -o $@ $(CFLAGS) -DT_NTLM $(SRCS) $(LDFLAGS) $(LIBS)
+
+test-ntlmv2: $(SRCS)
+	$(CC) -o $@ $(CFLAGS) -DT_NTLM2 $(SRCS) $(LDFLAGS) $(LIBS)
+
+test-ntlmv2s: $(SRCS)
+	$(CC) -o $@ $(CFLAGS) -DT_NTLM2S $(SRCS) $(LDFLAGS) $(LIBS)
+
+install:
+
+clean:
+	rm -f *.o *~ test-ntlm test-ntlmv2 test-ntlmv2s
+
+distclean: clean
+	rm -f Makefile

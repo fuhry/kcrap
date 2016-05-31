@@ -1,0 +1,11 @@
+kcrap (0.2.3-9) unstable; urgency=low
+
+  * Update dependencies and other stuff in debian/control
+
+ -- Dan Fuhry <dan@fuhry.com>  Fri, 27 May 2016 12:55:44 -0400
+
+kcrap (0.2.3-8) unstable; urgency=medium
+
+  * Initial release
+
+ -- Dan Fuhry <dan@fuhry.com>  Thu, 26 May 2016 15:00:18 -0400

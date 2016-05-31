@@ -1,0 +1,45 @@
+PREFIX=@prefix@
+
+CC=@CC@
+CFLAGS=@CFLAGS@ @PICFLAG@
+LDFLAGS=@LDFLAGS@
+EXTRA_LIBS=@LIBS@
+LIBS=-lkrb5 -lk5crypto -lcom_err $(EXTRA_LIBS)
+LDSH=@LDSH@
+LDSHFLAGS=@LDSHFLAGS@
+SOEXT=@SOEXT@
+SOEXTVER=@SOEXTVER@
+LIBINC=@LIBINC@
+
+INSTALL=@INSTALL@
+
+OBJS=kcraplib.o
+
+all: libkcrap.@SOEXT@ libkcrap.a
+
+libkcrap.$(SOEXT): $(OBJS)
+@MKSO@	$(LDSH) $(LDSHFLAGS) -soname=libkcrap.$(SOEXTVER) -o libkcrap.$(SOEXTVER) $(OBJS) $(LDFLAGS) $(LIBS)
+@MKSO@	-[ "$(SOEXT)" != "$(SOEXTVER)" ] && \
+@MKSO@		rm -f libkcrap.$(SOEXT) && \
+@MKSO@		ln -s libkcrap.$(SOEXTVER) libkcrap.$(SOEXT)
+
+libkcrap.a: $(LIBINC) $(OBJS)
+	rm -f libkcrap.a && \
+	ar cru libkcrap.a $(LIBINC) $(OBJS)
+
+install:
+	mkdir -p $(DESTDIR)$(PREFIX)/lib $(DESTDIR)$(PREFIX)/include
+	$(INSTALL) libkcrap.a $(DESTDIR)$(PREFIX)/lib/
+	[ "$(SOEXTVER)" = "" ] || \
+		$(INSTALL) libkcrap.$(SOEXTVER) $(DESTDIR)$(PREFIX)/lib/
+	[ "$(SOEXTVER)" = "$(SOEXT)" ] || \
+		rm -f $(DESTDIR)$(PREFIX)/lib/libkcrap.$(SOEXT)
+	[ "$(SOEXTVER)" = "$(SOEXT)" ] || \
+		ln -s libkcrap.$(SOEXTVER) $(DESTDIR)$(PREFIX)/lib/libkcrap.$(SOEXT)
+	$(INSTALL) kcrap.h $(DESTDIR)$(PREFIX)/include/
+
+clean:
+	rm -f $(OBJS) *.o *~ libkcrap.$(SOEXTVER) libkcrap.$(SOEXT) libkcrap.a
+
+distclean: clean
+	rm -f Makefile
