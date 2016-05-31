@@ -1,6 +1,10 @@
 Kerberos Challenge Response Authentication Protocol [KCRAP]
 Version 0.2.3
 
+Authors:
+  Jonathan Chen <kcrap+web@spock.org>
+  Dan Fuhry <dan@fuhry.com>
+
 Release Notes
 
 ========================================================================
@@ -9,14 +13,17 @@ Release Notes
 Notes about this version
 ------------------------
 
-This is an initial proof-of-concept quality code.
-It has been tested and verified to work acceptably on my system.
-Some important features are still missing in this program.
-Use at your own risk.
-APIs and network protocols are subject to change.
-See TODO file for list of missing features.
-Supports MIT KRB5 1.4-1.7
+This code works but is considered to be "proof-of-concept"-quality -
+it may or may not work for your given situation.
 
+Check the debian/patches/ directory and apply the patches in order
+(as noted in the "series" file) to bring the source up to date with
+recent Kerberos API versions and add some new features:
+
+  - The "additional response" field mandated by MSCHAP and used by
+    FreeRADIUS's mschap module to seed the session key
+  - A binary, kcrapclient, which can be used as a direct replacement
+    for Samba's ntlm_auth tool.
 
 
 Building and installing KCRAP
