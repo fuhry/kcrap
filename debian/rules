@@ -17,11 +17,11 @@
 %:
 	dh $@  --with autotools_dev --with systemd --with quilt
 
-override_dh_build:
+override_dh_auto_configure:
 	autoconf
 	autoreconf
 	
-	dh_build
+	dh_auto_configure
 
 # dh_make generated override targets
 # This is example for Cmake (See https://bugs.debian.org/641051 )
