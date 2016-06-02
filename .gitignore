@@ -1,0 +1,3 @@
+debian/kcrap
+debian/*.log
+debian/*.substvars
