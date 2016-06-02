@@ -1,0 +1,14 @@
+# kcrap_server - KCRAP protocol server
+#
+# KCRAP implements MS-CHAP authentication on top of MIT Kerberos.
+
+
+description	"KCRAP server"
+
+start on runlevel [2345]
+stop on runlevel [!2345]
+
+expect fork
+respawn
+
+exec kcrap_server -f /etc/kcrap_server.conf -p /run/kcrap.pid

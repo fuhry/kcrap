@@ -1,3 +1,9 @@
+kcrap (0.2.3-10) unstable; urgency=low
+
+  * Add upstart conf
+
+ -- Dan Fuhry <dan@fuhry.com>  Thu, 2 Jun 2016 10:52:04 -0400
+
 kcrap (0.2.3-9) unstable; urgency=low
 
   * Update dependencies and other stuff in debian/control
