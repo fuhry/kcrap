@@ -6,7 +6,7 @@ diff -Naur kcrap-0.2.3/lib/Makefile.in kcrap-0.2.3-patched/lib/Makefile.in
  
  libkcrap.$(SOEXT): $(OBJS)
 -@MKSO@	$(LDSH) $(LDSHFLAGS) -soname=libkcrap.$(SOEXTVER) -o libkcrap.$(SOEXTVER) $(OBJS) $(LDFLAGS) $(LIBS)
-+@MKSO@	$(LDSH) $(LDSHFLAGS) -o libkcrap.$(SOEXTVER) $(OBJS) $(LDFLAGS) $(LIBS)
++@MKSO@	$(LDSH) $(LDSHFLAGS) -o libkcrap.$(SOEXTVER) $(OBJS) $(LDFLAGS) -Wl,-soname=libkcrap.$(SOEXTVER) $(LIBS)
  @MKSO@	-[ "$(SOEXT)" != "$(SOEXTVER)" ] && \
  @MKSO@		rm -f libkcrap.$(SOEXT) && \
  @MKSO@		ln -s libkcrap.$(SOEXTVER) libkcrap.$(SOEXT)
