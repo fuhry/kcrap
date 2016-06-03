@@ -1,3 +1,9 @@
+kcrap (0.2.3-11) unstable; urgency=medium
+
+  * Modify soname patch to set soname properly at compile-time
+
+ -- Neal Gompa <ngompa13@gmail.com>  Fri, 03 Jun 2016 13:33:47 -0400
+
 kcrap (0.2.3-10) unstable; urgency=low
 
   * Add upstart conf
