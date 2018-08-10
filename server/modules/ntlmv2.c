@@ -21,7 +21,7 @@ static int ntlm2_auth(krb5_context context, struct kcrap_auth_req_data *req, int
     int retval;
     int nkeys;
     struct keyblocks keyblocks[5];
-    HMAC_CTX ctx;
+    HMAC_CTX *ctx = HMAC_CTX_new();
     unsigned char *tmpbuf;
     int i, j;
     unsigned char v2hash[EVP_MAX_MD_SIZE];
@@ -84,11 +84,11 @@ static int ntlm2_auth(krb5_context context, struct kcrap_auth_req_data *req, int
 	dump_data(v2hash, v2hlen);
 #endif
 
-	HMAC_Init(&ctx, v2hash, v2hlen, EVP_md5());
-	HMAC_Update(&ctx, (unsigned char*)req->server_challenge.data, req->server_challenge.length);
-	HMAC_Update(&ctx, (unsigned char*)req->client_challenge.data, req->client_challenge.length);
-	HMAC_Final(&ctx, resp, &resplen);
-	HMAC_cleanup(&ctx);
+	HMAC_CTX_reset(ctx);
+	HMAC_Update(ctx, (unsigned char*)req->server_challenge.data, req->server_challenge.length);
+	HMAC_Update(ctx, (unsigned char*)req->client_challenge.data, req->client_challenge.length);
+	HMAC_Final(ctx, resp, &resplen);
+	HMAC_CTX_free(ctx);
     
 	if (resplen != 16) {
 	    if (tmpbuf) free(tmpbuf);

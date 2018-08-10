@@ -20,7 +20,7 @@
 
 static krb5_error_code lanman_hash1(unsigned char *pw, unsigned char *chal, unsigned char *resp) {
     DES_cblock key8;
-    des_key_schedule ks;
+    DES_key_schedule ks;
      
     key8[0] = pw[0] & 0xFE;
     key8[1] = ((pw[0]<<7 &0x80)|(pw[1]>>1 &0x7E));
