@@ -18,7 +18,7 @@ OBJS=kcraplib.o
 all: libkcrap.@SOEXT@ libkcrap.a
 
 libkcrap.$(SOEXT): $(OBJS)
-@MKSO@	$(LDSH) $(LDSHFLAGS) -soname=libkcrap.$(SOEXTVER) -o libkcrap.$(SOEXTVER) $(OBJS) $(LDFLAGS) $(LIBS)
+@MKSO@	$(LDSH) $(LDSHFLAGS) -Wl,-soname=libkcrap.$(SOEXTVER) -o libkcrap.$(SOEXTVER) $(OBJS) $(LDFLAGS) $(LIBS)
 @MKSO@	-[ "$(SOEXT)" != "$(SOEXTVER)" ] && \
 @MKSO@		rm -f libkcrap.$(SOEXT) && \
 @MKSO@		ln -s libkcrap.$(SOEXTVER) libkcrap.$(SOEXT)

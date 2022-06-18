@@ -23,14 +23,14 @@
 
 #define SDATA(VAR,VAL) (VAR).data = (VAL), (VAR).length = strlen((VAR).data)
 
-#define FILL(DST,SRC) do {			\
-    int i = 0;					\
-    char tb[3];					\
-    tb[2] = 0;					\
-    for (i = 0; i*2 < strlen(SRC); i++) {	\
-	memcpy(tb, (SRC)+(i*2), 2);		\
-	(DST)[i] = strtol(tb, NULL, 16);	\
-    }						\
+#define FILL(DST,SRC) do {                        \
+    int i = 0;                                        \
+    char tb[3];                                        \
+    tb[2] = 0;                                        \
+    for (i = 0; i*2 < strlen(SRC); i++) {        \
+        memcpy(tb, (SRC)+(i*2), 2);                \
+        (DST)[i] = strtol(tb, NULL, 16);        \
+    }                                                \
 } while (0)
 
 int main(int argc, char* argv[]) {
@@ -68,12 +68,12 @@ int main(int argc, char* argv[]) {
     req.client_challenge.length = 130;
     req.client_challenge.data = cchal;
     FILL(cchal,
-	 "01010000000000000090d336b734c301ffffff0011223344"
-	 "0000000002000c0044004f004d00410049004e0001000c005300450052005600"
-	 "450052000400140064006f006d00610069006e002e0063006f006d0003002200"
-	 "7300650072007600650072002e0064006f006d00610069006e002e0063006f00"
-	 "6d000000000000000000"
-	 );
+         "01010000000000000090d336b734c301ffffff0011223344"
+         "0000000002000c0044004f004d00410049004e0001000c005300450052005600"
+         "450052000400140064006f006d00610069006e002e0063006f006d0003002200"
+         "7300650072007600650072002e0064006f006d00610069006e002e0063006f00"
+         "6d000000000000000000"
+         );
     req.response.length = 16;
     req.response.data = resp;
     FILL(resp, "cbabbca713eb795d04c97abc01ee4983");
@@ -95,18 +95,18 @@ int main(int argc, char* argv[]) {
     
     context = kcrap_init(NULL, NULL);
     if (context == NULL) {
-	fprintf(stderr, "%s\n", kcrap_errmsg());
-	exit(1);
+        fprintf(stderr, "%s\n", kcrap_errmsg());
+        exit(1);
     }
     for (i = 0; i < cnt; i++) {
-	ret = kcrap_try(context, &req, &auth_status);
-	if (ret != 0) {
-	    fprintf(stderr, "Error: %s\n", kcrap_errmsg());
-	} else if (auth_status == 0) {
-	    fprintf(stderr, "Invalid response: %s\n", kcrap_errmsg());
-	} else {
-	    fprintf(stderr, "Authentication OK\n");
-	}
+        ret = kcrap_try(context, &req, &auth_status);
+        if (ret != 0) {
+            fprintf(stderr, "Error: %s\n", kcrap_errmsg());
+        } else if (auth_status == 0) {
+            fprintf(stderr, "Invalid response: %s\n", kcrap_errmsg());
+        } else {
+            fprintf(stderr, "Authentication OK\n");
+        }
     }
     kcrap_free(context);
     return 0;

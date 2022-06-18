@@ -47,29 +47,29 @@ static int ntlm2s_auth(krb5_context context, struct kcrap_auth_req_data *req, in
     unsigned char response[24];
 
     if (req->server_challenge.length < 8) {
-	*errnum = EINVAL;
-	error_data->data = strdup("Invalid server challenge length");
-	error_data->length = strlen(error_data->data);
-	return 0;
+        *errnum = EINVAL;
+        error_data->data = strdup("Invalid server challenge length");
+        error_data->length = strlen(error_data->data);
+        return 0;
     }
 
     if (req->client_challenge.length < 8) {
-	*errnum = EINVAL;
-	error_data->data = strdup("Invalid client challenge length");
-	error_data->length = strlen(error_data->data);
-	return 0;
+        *errnum = EINVAL;
+        error_data->data = strdup("Invalid client challenge length");
+        error_data->length = strlen(error_data->data);
+        return 0;
     }
 
     if (req->response.length != 24) {
-	*errnum = EINVAL;
-	error_data->data = strdup("Invalid response length");
-	error_data->length = strlen(error_data->data);
-	return 0;
+        *errnum = EINVAL;
+        error_data->data = strdup("Invalid response length");
+        error_data->length = strlen(error_data->data);
+        return 0;
     }
     
     nkeys = sizeof(keyblocks) / sizeof(struct keyblocks);
     if ((retval = kcrap_getkey(context, req->principal, ENCTYPE_ARCFOUR_HMAC, &nkeys, keyblocks)))
-	goto fail0;
+        goto fail0;
 
     MD5_Init(&ctx);
     MD5_Update(&ctx, req->server_challenge.data, 8);
@@ -77,36 +77,36 @@ static int ntlm2s_auth(krb5_context context, struct kcrap_auth_req_data *req, in
     MD5_Final(seshash, &ctx);
 
     for (i = 0; i < nkeys; i++) {
-	if (keyblocks[i].key.length != 16) continue;
-	memcpy(key21, keyblocks[i].key.contents, 16);
-	memset(key21+16, 0, 5);
+        if (keyblocks[i].key.length != 16) continue;
+        memcpy(key21, keyblocks[i].key.contents, 16);
+        memset(key21+16, 0, 5);
 
-	if ((retval = lanman_hash1(key21   , seshash, response)))
-	    goto fail;
-	if ((retval = lanman_hash1(key21+7 , seshash, response+8)))
-	    goto fail;
-	if ((retval = lanman_hash1(key21+14, seshash, response+16)))
-	    goto fail;
+        if ((retval = lanman_hash1(key21   , seshash, response)))
+            goto fail;
+        if ((retval = lanman_hash1(key21+7 , seshash, response+8)))
+            goto fail;
+        if ((retval = lanman_hash1(key21+14, seshash, response+16)))
+            goto fail;
 
 #ifdef DEBUG_PASSWORD
-	fprintf(stderr, "principal:\n");
-	dump_data(req->principal.data, req->principal.length);
-	fprintf(stderr, "seshash:\n");
-	dump_data(seshash, 8);
-	fprintf(stderr, "key21:\n");
-	dump_data(key21, 16);
-	fprintf(stderr, "response:\n");
-	dump_data(response, 24);
+        fprintf(stderr, "principal:\n");
+        dump_data(req->principal.data, req->principal.length);
+        fprintf(stderr, "seshash:\n");
+        dump_data(seshash, 8);
+        fprintf(stderr, "key21:\n");
+        dump_data(key21, 16);
+        fprintf(stderr, "response:\n");
+        dump_data(response, 24);
 #endif
 
-	if (memcmp(response, req->response.data, 24) == 0) {
-	    *errnum = 0;
-	    goto ok;
-	}
+        if (memcmp(response, req->response.data, 24) == 0) {
+            *errnum = 0;
+            goto ok;
+        }
     }
 
     for (i = 0; i < nkeys; i++)
-	krb5_free_keyblock_contents(context, &keyblocks[i].key);
+        krb5_free_keyblock_contents(context, &keyblocks[i].key);
     *errnum = 0;
     error_data->data = strdup("Invalid response");
     error_data->length = strlen(error_data->data);
@@ -114,12 +114,12 @@ static int ntlm2s_auth(krb5_context context, struct kcrap_auth_req_data *req, in
     
     ok:
     for (i = 0; i < nkeys; i++)
-	krb5_free_keyblock_contents(context, &keyblocks[i].key);
+        krb5_free_keyblock_contents(context, &keyblocks[i].key);
     return KCRAP_AUTH_OK;;
-	
+        
     fail:
     for (i = 0; i < nkeys; i++)
-	krb5_free_keyblock_contents(context, &keyblocks[i].key);
+        krb5_free_keyblock_contents(context, &keyblocks[i].key);
     fail0:
     *errnum = retval;
     error_data->data = strdup(error_message(retval));
@@ -133,19 +133,19 @@ static int ntlm2s_makechal(krb5_context context, struct kcrap_chal_req_data *req
     chal->length = 8;
     chal->data = malloc(chal->length);
     if (chal->data == 0) {
-	perror("malloc");
-	*errnum = errno;
-	error_data->data = strdup(error_message(errno));
-	error_data->length = strlen(error_data->data);
-	return errno;
+        perror("malloc");
+        *errnum = errno;
+        error_data->data = strdup(error_message(errno));
+        error_data->length = strlen(error_data->data);
+        return errno;
     } else {
-	if ((retval = krb5_c_random_make_octets(context, chal))) {
-	    *errnum = retval;
-	    error_data->data = strdup(error_message(retval));
-	    error_data->length = strlen(error_data->data);
-	    free(chal->data);
-	    return retval;
-	}
+        if ((retval = krb5_c_random_make_octets(context, chal))) {
+            *errnum = retval;
+            error_data->data = strdup(error_message(retval));
+            error_data->length = strlen(error_data->data);
+            free(chal->data);
+            return retval;
+        }
     }
     return 0;
 }
@@ -153,6 +153,6 @@ static int ntlm2s_makechal(krb5_context context, struct kcrap_chal_req_data *req
 
 struct kcrap_module ntlmv2s_module = {
     "NTLM2S",
-	ntlm2s_auth,
-	ntlm2s_makechal
+        ntlm2s_auth,
+        ntlm2s_makechal
 };

@@ -249,6 +249,32 @@ if [[ "$build_server" = 1 ]]; then
     AC_MSG_RESULT(not 8-argument)
   ])
 
+  AC_MSG_CHECKING(more argument to krb5_db_get_principal)
+  AC_TRY_LINK([#include <unistd.h>
+#include <krb5.h>
+#include <profile.h>
+#include <com_err.h>
+#include <kdb.h>],
+  [krb5_db_get_principal(NULL, NULL, 0, NULL, NULL)], [
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_KRB5_DB_GET_PRINCIPAL_MORE, [], [Use more arg to krb5_db_get_princip])
+  ],[
+    AC_MSG_RESULT(no)
+  ])
+
+  AC_MSG_CHECKING(nentries argument to krb5_db_free_principal)
+  AC_TRY_LINK([#include <unistd.h>
+#include <krb5.h>
+#include <profile.h>
+#include <com_err.h>
+#include <kdb.h>],
+  [krb5_db_free_principal(NULL, NULL, 0)], [
+    AC_MSG_RESULT(yes)
+    AC_DEFINE(HAVE_KRB5_DB_FREE_PRINCIPAL_NENTRIES, [], [Use nentries arg to krb5_db_free_princip])
+  ],[
+    AC_MSG_RESULT(no)
+  ])
+
   LIBS="$save_LIBS"
 fi
 

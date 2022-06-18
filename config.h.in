@@ -6,17 +6,23 @@
 /* Have 8-argument krb5_db_fetch_mkey() function with kvno */
 #undef HAVE_KRB5_DB_FETCH_MKEY_KVNO
 
+/* Use nentries arg to krb5_db_free_princip */
+#undef HAVE_KRB5_DB_FREE_PRINCIPAL_NENTRIES
+
+/* Use more arg to krb5_db_get_princip */
+#undef HAVE_KRB5_DB_GET_PRINCIPAL_MORE
+
 /* Have krb5_db_open (mit krb5 1.6) */
 #undef HAVE_KRB5_DB_OPEN
 
 /* Have krb5_db_set_name (mit krb5 1.4) */
 #undef HAVE_KRB5_DB_SET_NAME
 
-/* Define to 1 if you have the <memory.h> header file. */
-#undef HAVE_MEMORY_H
-
 /* Define to 1 if you have the <stdint.h> header file. */
 #undef HAVE_STDINT_H
+
+/* Define to 1 if you have the <stdio.h> header file. */
+#undef HAVE_STDIO_H
 
 /* Define to 1 if you have the <stdlib.h> header file. */
 #undef HAVE_STDLIB_H
@@ -54,7 +60,9 @@
 /* Define to the version of this package. */
 #undef PACKAGE_VERSION
 
-/* Define to 1 if you have the ANSI C header files. */
+/* Define to 1 if all of the C90 standard headers exist (not just the ones
+   required in a freestanding environment). This macro is provided for
+   backward compatibility; new code need not use it. */
 #undef STDC_HEADERS
 
 /* Use stub kdb.h */
