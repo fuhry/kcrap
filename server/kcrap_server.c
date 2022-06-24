@@ -19,7 +19,7 @@
 #include "kcrap_kdb.h"
 #include "modules.h"
 
-#define DEFAULT_CFG_FILE "kcrap_server.conf"
+#define DEFAULT_CFG_FILE "/etc/kcrap_server.conf"
 #define DEFAULT_PID_FILE "/var/run/kcrap_server.pid"
 #define KCRAPSEC "kcrap_server"
 
