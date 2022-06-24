@@ -58,7 +58,7 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
-    while ((ch = getopt(argc, argv, "Vf:k:")) != -1)
+    while ((ch = getopt(argc, argv, "VDf:k:")) != -1)
         switch (ch)
         {
         case 'V':
@@ -66,6 +66,7 @@ int main(int argc, char *argv[])
             exit(0);
         case 'D':
             nodetach++;
+            break;
         case 'f':
             cfg_file = optarg;
             break;
