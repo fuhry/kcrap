@@ -1,1 +1,1 @@
-void dump_data (char* data, int len);
+void dump_data(char *data, int len);

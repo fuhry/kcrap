@@ -33,11 +33,13 @@ static int setup_socket(char *progname);
 static void mainloop(int sock, krb5_context context, krb5_principal sprinc, krb5_keytab keytab);
 static void usage(char *name);
 
-static void usage(char *name) {
+static void usage(char *name)
+{
     fprintf(stderr, "usage: %s [-V] [-D] [-f config_file] [-p pidfile] [-k keytab]\n", name);
 }
 
-int main(int argc, char* argv[]) {
+int main(int argc, char *argv[])
+{
     char *cfg_file = DEFAULT_CFG_FILE;
     char *pid_file = DEFAULT_PID_FILE;
     krb5_error_code retval;
@@ -50,64 +52,76 @@ int main(int argc, char* argv[]) {
     char *optarg;
 
     retval = krb5_init_context(&context);
-    if (retval) {
+    if (retval)
+    {
         com_err(argv[0], retval, "while initializing krb5");
         exit(1);
     }
 
     while ((ch = getopt(argc, argv, "Vf:k:")) != -1)
-    switch (ch) {
-    case 'V':
-        printf("kcrap_server " KCRAP_VERSION "\n");
-        exit(0);
-    case 'D':
-        nodetach++;
-    case 'f':
-        cfg_file = optarg;
-        break;
-    case 'p':
-        pid_file = optarg;
-        break;
-    case 'k':
-        if ((retval = krb5_kt_resolve(context, optarg, &keytab))) {
-            com_err(argv[0], retval, "while resolving keytab file %s", optarg);
+        switch (ch)
+        {
+        case 'V':
+            printf("kcrap_server " KCRAP_VERSION "\n");
+            exit(0);
+        case 'D':
+            nodetach++;
+        case 'f':
+            cfg_file = optarg;
+            break;
+        case 'p':
+            pid_file = optarg;
+            break;
+        case 'k':
+            if ((retval = krb5_kt_resolve(context, optarg, &keytab)))
+            {
+                com_err(argv[0], retval, "while resolving keytab file %s", optarg);
+                exit(1);
+            }
+            break;
+        default:
+            usage(argv[0]);
             exit(1);
+            break;
         }
-        break;
-    default:
-        usage(argv[0]);
-        exit(1);
-        break;
-    }
 
     retval = profile_init_path(cfg_file, &profile);
-    if (retval) {
+    if (retval)
+    {
         com_err(argv[0], retval, "while reading config file");
         exit(1);
     }
 
-    if ((retval = krb5_sname_to_principal(context, NULL, "host", KRB5_NT_SRV_HST, &sprinc))) {
+    if ((retval = krb5_sname_to_principal(context, NULL, "host", KRB5_NT_SRV_HST, &sprinc)))
+    {
         com_err(argv[0], retval, "while generating service name");
         exit(1);
     }
 
-    if (kcrap_open_kdb(context, profile, KCRAPSEC) != 0) {
-        exit(1);
-    }
-    
-    sock = setup_socket(argv[0]);
-    if (sock < 0) {
+    if (kcrap_open_kdb(context, profile, KCRAPSEC) != 0)
+    {
         exit(1);
     }
 
-    if (!nodetach) {
+    sock = setup_socket(argv[0]);
+    if (sock < 0)
+    {
+        exit(1);
+    }
+
+    if (!nodetach)
+    {
         retval = fork();
-        if (retval < 0) {
+        if (retval < 0)
+        {
             perror("fork");
             exit(1);
-        } else if (retval > 0) {
+        }
+        else if (retval > 0)
+        {
             FILE *f;
-            if ((f = fopen(pid_file, "w"))) {
+            if ((f = fopen(pid_file, "w")))
+            {
                 fprintf(f, "%d\n", retval);
                 fclose(f);
             }
@@ -115,36 +129,40 @@ int main(int argc, char* argv[]) {
         }
         chdir("/");
     }
-    
+
     mainloop(sock, context, sprinc, keytab);
     exit(1);
 }
 
-static int setup_socket(char* progname) {
+static int setup_socket(char *progname)
+{
     int sock;
     krb5_error_code retval;
     int port;
     int on;
     struct sockaddr_in sa;
-    
+
     retval = profile_get_integer(profile, KCRAPSEC, "port", NULL, 89, &port);
-    if (retval) {
+    if (retval)
+    {
         com_err(progname, retval, "while parsing config file (port)");
         return -1;
     }
 
-    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    if ((sock = socket(AF_INET, SOCK_DGRAM, 0)) < 0)
+    {
         perror("opening datagram socket");
         return -1;
     }
 
     on = 1;
-    (void) setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on));
+    (void)setsockopt(sock, SOL_SOCKET, SO_REUSEADDR, (char *)&on, sizeof(on));
 
     memset((char *)&sa, 0, sizeof(sa));
     sa.sin_family = AF_INET;
     sa.sin_port = htons(port);
-    if (bind(sock, (struct sockaddr *)&sa, sizeof(sa))) {
+    if (bind(sock, (struct sockaddr *)&sa, sizeof(sa)))
+    {
         perror("binding datagram socket");
         return -1;
     }
@@ -152,16 +170,20 @@ static int setup_socket(char* progname) {
     return sock;
 }
 
-static void mainloop(int sock, krb5_context context, krb5_principal sprinc, krb5_keytab keytab) {
-    while (1) {
+static void mainloop(int sock, krb5_context context, krb5_principal sprinc, krb5_keytab keytab)
+{
+    while (1)
+    {
         socklen_t len;
         struct sockaddr_in sa;
         int ret;
         char pktbuf[65536];
 
         len = sizeof(sa);
-        if ((ret = recvfrom(sock, pktbuf, sizeof(pktbuf), 0, (struct sockaddr *)&sa, &len)) < 0) {
-            if (errno == EAGAIN || errno == EINTR) continue;
+        if ((ret = recvfrom(sock, pktbuf, sizeof(pktbuf), 0, (struct sockaddr *)&sa, &len)) < 0)
+        {
+            if (errno == EAGAIN || errno == EINTR)
+                continue;
             perror("receiving datagram");
             return;
         }
@@ -170,7 +192,8 @@ static void mainloop(int sock, krb5_context context, krb5_principal sprinc, krb5
 }
 
 static int handle_message(int sock, krb5_context context, krb5_principal sprinc, krb5_keytab keytab,
-                          char *buf, int buflen, struct sockaddr_in *sa) {
+                          char *buf, int buflen, struct sockaddr_in *sa)
+{
     int offset = 0;
     struct kcrap_req_pkt pkt;
     krb5_error_code retval;
@@ -180,20 +203,23 @@ static int handle_message(int sock, krb5_context context, krb5_principal sprinc,
     krb5_keyblock *keyblock;
 
     GETSHORT(pkt.pkt_type, buf, buflen, offset);
-    if (pkt.pkt_type != KCRAP_PKT_AUTH_REQ) return EINVAL;
+    if (pkt.pkt_type != KCRAP_PKT_AUTH_REQ)
+        return EINVAL;
 
     GETDATA(pkt.ap_req, buf, buflen, offset);
     GETDATA(pkt.enc_data.ciphertext, buf, buflen, offset);
 
-
     /* Check authentication info */
-    if ((retval = krb5_rd_req(context, &auth_context, &pkt.ap_req, sprinc, keytab, NULL, &ticket))) {
+    if ((retval = krb5_rd_req(context, &auth_context, &pkt.ap_req, sprinc, keytab, NULL, &ticket)))
+    {
         com_err("", retval, "while reading request");
         goto free0;
     }
 
-    if ((retval = krb5_auth_con_getrecvsubkey(context, auth_context, &keyblock))) {
-        if ((retval = krb5_auth_con_getkey(context, auth_context, &keyblock))) {
+    if ((retval = krb5_auth_con_getrecvsubkey(context, auth_context, &keyblock)))
+    {
+        if ((retval = krb5_auth_con_getkey(context, auth_context, &keyblock)))
+        {
             com_err("", retval, "while getting auth context key");
             goto free1;
         }
@@ -203,30 +229,33 @@ static int handle_message(int sock, krb5_context context, krb5_principal sprinc,
     pkt.enc_data.kvno = 0;
 
     message.length = pkt.enc_data.ciphertext.length;
-    if ((message.data = malloc(pkt.enc_data.ciphertext.length)) == NULL) {
+    if ((message.data = malloc(pkt.enc_data.ciphertext.length)) == NULL)
+    {
         com_err("", retval, "while decrypting message");
         goto free2;
     }
 
-    if ((retval = krb5_c_decrypt(context, keyblock, pkt.pkt_type, NULL, &pkt.enc_data, &message))) {
+    if ((retval = krb5_c_decrypt(context, keyblock, pkt.pkt_type, NULL, &pkt.enc_data, &message)))
+    {
         com_err("", retval, "while decrypting message");
         goto free3;
     }
     retval = handle_auth_req(sock, context, auth_context, &message, keyblock, sa);
     krb5_free_data_contents(context, &message);
 
-    free3:
+free3:
     free(message.data);
-    free2:
+free2:
     krb5_free_keyblock(context, keyblock);
-    free1:
+free1:
     krb5_auth_con_free(context, auth_context);
     krb5_free_ticket(context, ticket);
-    free0:
+free0:
     return retval;
 }
 
-static int handle_auth_req(int sock, krb5_context context, krb5_auth_context auth_context, krb5_data *message, krb5_keyblock *keyblock, struct sockaddr_in *sa) {
+static int handle_auth_req(int sock, krb5_context context, krb5_auth_context auth_context, krb5_data *message, krb5_keyblock *keyblock, struct sockaddr_in *sa)
+{
     int offset = 0;
     struct kcrap_auth_req_data req;
     char pktbuf[65536];
@@ -245,7 +274,8 @@ static int handle_auth_req(int sock, krb5_context context, krb5_auth_context aut
     error_msg.data = NULL;
 
     GETSHORT(req.pkt_type, message->data, message->length, offset);
-    if (req.pkt_type != KCRAP_PKT_AUTH_REQ) return EINVAL;
+    if (req.pkt_type != KCRAP_PKT_AUTH_REQ)
+        return EINVAL;
     GETDATA(req.chal_type, message->data, message->length, offset);
     GETINT(req.timestamp, message->data, message->length, offset);
     GETINT(req.nounce, message->data, message->length, offset);
@@ -276,13 +306,15 @@ static int handle_auth_req(int sock, krb5_context context, krb5_auth_context aut
     SETINT(error_num, pktbuf, sizeof(pktbuf), offset);
     SETDATA(error_msg, pktbuf, sizeof(pktbuf), offset);
 
-    if ((retval = krb5_c_encrypt_length(context, keyblock->enctype, offset, &len))) {
+    if ((retval = krb5_c_encrypt_length(context, keyblock->enctype, offset, &len)))
+    {
         com_err("", retval, "while getting enc length");
         goto free0;
     }
     enc_packet.ciphertext.length = len;
 
-    if (NULL == (enc_packet.ciphertext.data = malloc(enc_packet.ciphertext.length))) {
+    if (NULL == (enc_packet.ciphertext.data = malloc(enc_packet.ciphertext.length)))
+    {
         com_err("", retval, "while malloc enc");
         goto free0;
     }
@@ -290,14 +322,16 @@ static int handle_auth_req(int sock, krb5_context context, krb5_auth_context aut
     enc_packet.kvno = 0;
     plain_packet.data = pktbuf;
     plain_packet.length = offset;
-    
-    if ((retval = krb5_c_encrypt(context, keyblock, KCRAP_PKT_AUTH_REP, NULL, &plain_packet, &enc_packet))) {
+
+    if ((retval = krb5_c_encrypt(context, keyblock, KCRAP_PKT_AUTH_REP, NULL, &plain_packet, &enc_packet)))
+    {
         com_err("", retval, "at krb5_c_encrypt");
         goto free1;
     }
 
-    len = sizeof(short)*2 + enc_packet.ciphertext.length;
-    if (!(rawpkt = malloc(len))) {
+    len = sizeof(short) * 2 + enc_packet.ciphertext.length;
+    if (!(rawpkt = malloc(len)))
+    {
         com_err("", retval, "at malloc");
         goto free1;
     }
@@ -305,21 +339,18 @@ static int handle_auth_req(int sock, krb5_context context, krb5_auth_context aut
     offset = 0;
     SETSHORT(KCRAP_PKT_AUTH_REP, rawpkt, len, offset);
     SETDATA(enc_packet.ciphertext, rawpkt, len, offset);
-    
-    ret = sendto(sock, rawpkt, offset, 0, (struct sockaddr*)sa, sizeof(*sa));
+
+    ret = sendto(sock, rawpkt, offset, 0, (struct sockaddr *)sa, sizeof(*sa));
 
     free(rawpkt);
-    free1:
+free1:
     krb5_free_data_contents(context, &enc_packet.ciphertext);
-    free0:
+free0:
     krb5_free_data_contents(context, &error_msg);
     return ret;
 }
 
-static int verify_cookie(struct kcrap_auth_req_data *req) {
+static int verify_cookie(struct kcrap_auth_req_data *req)
+{
     return 0;
 }
-
-
-
-
