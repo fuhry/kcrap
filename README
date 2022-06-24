@@ -1,5 +1,5 @@
 Kerberos Challenge Response Authentication Protocol [KCRAP]
-Version 0.2.3
+Version 0.3.0
 
 Authors:
   Jonathan Chen <kcrap+web@spock.org>
@@ -25,6 +25,11 @@ recent Kerberos API versions and add some new features:
   - A binary, kcrapclient, which can be used as a direct replacement
     for Samba's ntlm_auth tool.
 
+Release 0.3.0 ensures compatibility with MIT Kerberos V 1.19. Effort
+was made to peserve compatibility with prior Kerberos versions, but
+this is untested. Moving forward as of June 2022, only the latest
+stable release of MIT Kerberos V will be tested or officially
+supported.
 
 Building and installing KCRAP
 -----------------------------
