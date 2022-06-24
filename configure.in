@@ -205,6 +205,26 @@ AC_ARG_WITH(library,
 ])
 
 
+build_client=0
+AC_MSG_CHECKING(whether to build KCRAP client)
+AC_ARG_WITH(client,
+[  --with-client          build KCRAP client (default yes) ],
+[ case "$withval" in
+    no)
+       AC_MSG_RESULT(no)
+       ;;
+    *)
+       build_client=1
+       AC_MSG_RESULT(yes)
+       ;;
+  esac
+],
+[ build_client=1
+  AC_MSG_RESULT(yes)
+])
+
+
+
 build_tests=0
 AC_MSG_CHECKING(whether to build KCRAP tests)
 AC_ARG_WITH(tests,
@@ -302,6 +322,13 @@ if [[ "$build_tests" = "1" ]]; then
   SUBDIR="${SUBDIR}${SUBDIR:+ }test"
 else
   echo "  KCRAP tests: NO"
+fi
+
+if [[ "$build_client" = "1" ]]; then
+  echo "  KCRAP client: YES"
+  SUBDIR="${SUBDIR}${SUBDIR:+ }client"
+else
+  echo "  KCRAP client: NO"
 fi
 
 if [[ "$MKSO" = "#" ]]; then

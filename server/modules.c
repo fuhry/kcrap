@@ -13,7 +13,7 @@
 
 #include "modules_list.h"
 
-int do_auth(krb5_context context, struct kcrap_auth_req_data *req, int *error_num, krb5_data *error_msg)
+int do_auth(krb5_context context, struct kcrap_auth_req_data *req, int *error_num, krb5_data *error_msg, struct kcrap_data *extra)
 {
     int retval;
     int i;
@@ -30,7 +30,7 @@ int do_auth(krb5_context context, struct kcrap_auth_req_data *req, int *error_nu
     {
         if (req->chal_type.length == strlen(kcrap_modules[i]->type) && memcmp(req->chal_type.data, kcrap_modules[i]->type, req->chal_type.length) == 0)
         {
-            retval = kcrap_modules[i]->auth_func(context, req, error_num, error_msg);
+            retval = kcrap_modules[i]->auth_func(context, req, error_num, error_msg, extra);
             goto done;
         }
     }

@@ -28,10 +28,15 @@
 
 #define ERRBUF 1024
 static char _errmsg[ERRBUF];
+static struct kcrap_data _extra;
 
 const char *kcrap_errmsg()
 {
 	return _errmsg;
+}
+
+const struct kcrap_data kcrap_get_extra_data() {
+    return _extra;
 }
 
 struct kcrap_context *kcrap_init(char *keytab, char *service)
@@ -173,6 +178,7 @@ static int auth_rep_decode(struct kcrap_context *context, char *buf, int len, kr
 	GETDATA(rep->response, buf, dec_data.length, offset);
 	GETINT(rep->error_num, buf, dec_data.length, offset);
 	GETDATA(rep->error_msg, buf, dec_data.length, offset);
+	GETDATA(rep->extra_data, buf, dec_data.length, offset);
 
 	return 0;
 }
@@ -217,6 +223,7 @@ static int kcrap_recv_rep(struct kcrap_context *context, int sock, int wait_ms, 
 		{
 			error_num = 0;
 			_errmsg[0] = 0;
+			_extra = rep.extra_data;
 		}
 		*auth_status = rep.auth_reply;
 		return error_num;

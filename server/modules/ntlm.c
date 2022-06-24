@@ -6,6 +6,7 @@
 #include <errno.h>
 
 #include <openssl/des.h>
+#include <openssl/md4.h>
 
 #include <krb5.h>
 #include <profile.h>
@@ -35,7 +36,8 @@ static krb5_error_code lanman_hash1(unsigned char *pw, unsigned char *chal, unsi
     return 0;
 }
 
-static int ntlm_auth(krb5_context context, struct kcrap_auth_req_data *req, int *errnum, krb5_data *error_data) {
+static int ntlm_auth(krb5_context context, struct kcrap_auth_req_data *req, int *errnum, krb5_data *error_data, struct kcrap_data *extra)
+{
     int retval;
     int nkeys;
     int i;
@@ -110,6 +112,20 @@ static int ntlm_auth(krb5_context context, struct kcrap_auth_req_data *req, int 
     return 0;
 
 ok:
+    /* Auth succeeded so send back the MD4 of the LM hash for further processing into a session key */
+    extra->data = malloc(16);
+    if (extra->data != NULL)
+    {
+        MD4_CTX c;
+        MD4_Init(&c);
+        MD4_Update(&c, key21, 16);
+        MD4_Final(extra->data, &c);
+        /* We are now doing the above MD4 instead of just sending back the LM hash of the password. */
+        /* This does break the client side freeradius stuff, but enhances security a bit */
+        /* memmove(extra->data, key21, 16); */
+        extra->length = 16;
+    }
+
     for (i = 0; i < nkeys; i++)
         krb5_free_keyblock_contents(context, &keyblocks[i].key);
     return KCRAP_AUTH_OK;

@@ -40,6 +40,7 @@ struct kcrap_auth_rep_data
     struct kcrap_data response;
     unsigned int error_num;
     struct kcrap_data error_msg;
+    struct kcrap_data extra_data;
 };
 
 struct kcrap_chal_req_data
@@ -69,5 +70,6 @@ struct kcrap_chal_rep_data
 struct kcrap_context *kcrap_init(char *keytab, char *service);
 void kcrap_free(struct kcrap_context *context);
 const char *kcrap_errmsg();
+const struct kcrap_data kcrap_get_extra_data();
 
 int kcrap_try(struct kcrap_context *context, struct kcrap_auth_req_data *req, int *auth_status);

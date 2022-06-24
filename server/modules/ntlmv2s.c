@@ -37,7 +37,8 @@ static krb5_error_code lanman_hash1(unsigned char *pw, unsigned char *chal, unsi
     return 0;
 }
 
-static int ntlm2s_auth(krb5_context context, struct kcrap_auth_req_data *req, int *errnum, krb5_data *error_data) {
+static int ntlm2s_auth(krb5_context context, struct kcrap_auth_req_data *req, int *errnum, krb5_data *error_data, struct kcrap_data *extra)
+{
     int retval;
     int nkeys;
     int i;

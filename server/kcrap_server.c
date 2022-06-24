@@ -268,6 +268,7 @@ static int handle_auth_req(int sock, krb5_context context, krb5_auth_context aut
     size_t len;
     krb5_data error_msg;
     int error_num;
+    struct kcrap_data extra;
 
     error_num = 0;
     error_msg.length = 0;
@@ -286,7 +287,8 @@ static int handle_auth_req(int sock, krb5_context context, krb5_auth_context aut
     GETDATA(req.client_challenge, message->data, message->length, offset);
     GETDATA(req.response, message->data, message->length, offset);
 
-    auth_ok = do_auth(context, &req, &error_num, &error_msg);
+    memset(&extra, 0, sizeof(struct kcrap_data));
+    auth_ok = do_auth(context, &req, &error_num, &error_msg, &extra);
 
     if (auth_ok)
         auth_ok |= verify_cookie(&req);
@@ -305,6 +307,7 @@ static int handle_auth_req(int sock, krb5_context context, krb5_auth_context aut
     SETDATA(req.response, pktbuf, sizeof(pktbuf), offset);
     SETINT(error_num, pktbuf, sizeof(pktbuf), offset);
     SETDATA(error_msg, pktbuf, sizeof(pktbuf), offset);
+    SETDATA(extra, pktbuf, sizeof(pktbuf), offset);
 
     if ((retval = krb5_c_encrypt_length(context, keyblock->enctype, offset, &len)))
     {

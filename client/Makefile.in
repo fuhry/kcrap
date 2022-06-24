@@ -1,0 +1,24 @@
+PREFIX=@prefix@
+CC=@CC@
+CFLAGS=-I../lib @CFLAGS@
+LDFLAGS=-L../lib @LDFLAGS@
+LIBS=-lkcrap
+
+INSTALL=@INSTALL@
+
+SRCS=kcrapclient.c
+
+all: kcrapclient
+
+kcrapclient: $(SRCS)
+	$(CC) -o $@ $(CFLAGS) $(SRCS) $(LDFLAGS) $(LIBS)
+
+install: kcrapclient
+	mkdir -p $(DESTDIR)$(PREFIX)/bin
+	$(INSTALL) -m755 kcrapclient $(DESTDIR)$(PREFIX)/bin/kcrapclient
+
+clean:
+	rm -f *.o *~ kcrapclient
+
+distclean: clean
+	rm -f Makefile

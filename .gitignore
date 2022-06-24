@@ -7,6 +7,7 @@ debian/*.substvars
 *.so.*
 Makefile
 autom4te.cache/
+client/kcrapclient
 config.h
 config.log
 config.status
@@ -17,4 +18,5 @@ test/test-ntlm
 test/test-ntlmv2
 test/test-ntlmv2s
 *~
+.vscode/
 

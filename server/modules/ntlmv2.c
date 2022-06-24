@@ -17,7 +17,8 @@
 #include "../modules.h"
 #include "../util.h"
 
-static int ntlm2_auth(krb5_context context, struct kcrap_auth_req_data *req, int *errnum, krb5_data *error_data) {
+static int ntlm2_auth(krb5_context context, struct kcrap_auth_req_data *req, int *errnum, krb5_data *error_data, struct kcrap_data *extra)
+{
     int retval;
     int nkeys;
     struct keyblocks keyblocks[5];
