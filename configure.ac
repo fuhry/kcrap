@@ -2,11 +2,12 @@
 # GNU autoconfigure script to tune options
 #
 
-AC_INIT(configure)
-AC_CONFIG_HEADER(config.h)
+AC_INIT
+AC_CONFIG_SRCDIR([configure])
+AC_CONFIG_HEADERS([config.h])
 
-AC_CANONICAL_SYSTEM
-AC_VALIDATE_CACHED_SYSTEM_TUPLE
+AC_CANONICAL_TARGET
+
 
 AC_PROG_CC
 
@@ -37,7 +38,6 @@ AC_ARG_ENABLE(debug,
 
 AC_PROG_GCC_TRADITIONAL
 AC_C_CONST
-AC_HEADER_STDC
 AC_PROG_INSTALL
 
 
@@ -257,12 +257,11 @@ if [[ "$build_server" = 1 ]]; then
   ])
 
   AC_MSG_CHECKING(8-argument krb5_db_fetch_mkey() with KVNO)
-  AC_TRY_LINK([#include <unistd.h>
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <unistd.h>
 #include <krb5.h>
 #include <profile.h>
 #include <com_err.h>
-#include <kdb.h>],
-  [krb5_db_fetch_mkey(NULL, NULL, 0, 0, 0, NULL, NULL, NULL, NULL)], [
+#include <kdb.h>]], [[krb5_db_fetch_mkey(NULL, NULL, 0, 0, 0, NULL, NULL, NULL, NULL)]])],[
     AC_MSG_RESULT(8-argument)
     AC_DEFINE(HAVE_KRB5_DB_FETCH_MKEY_KVNO, [], [Have 8-argument krb5_db_fetch_mkey() function with kvno])
   ],[
@@ -270,12 +269,11 @@ if [[ "$build_server" = 1 ]]; then
   ])
 
   AC_MSG_CHECKING(more argument to krb5_db_get_principal)
-  AC_TRY_LINK([#include <unistd.h>
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <unistd.h>
 #include <krb5.h>
 #include <profile.h>
 #include <com_err.h>
-#include <kdb.h>],
-  [krb5_db_get_principal(NULL, NULL, 0, NULL, NULL)], [
+#include <kdb.h>]], [[krb5_db_get_principal(NULL, NULL, 0, NULL, NULL)]])],[
     AC_MSG_RESULT(yes)
     AC_DEFINE(HAVE_KRB5_DB_GET_PRINCIPAL_MORE, [], [Use more arg to krb5_db_get_princip])
   ],[
@@ -283,12 +281,11 @@ if [[ "$build_server" = 1 ]]; then
   ])
 
   AC_MSG_CHECKING(nentries argument to krb5_db_free_principal)
-  AC_TRY_LINK([#include <unistd.h>
+  AC_LINK_IFELSE([AC_LANG_PROGRAM([[#include <unistd.h>
 #include <krb5.h>
 #include <profile.h>
 #include <com_err.h>
-#include <kdb.h>],
-  [krb5_db_free_principal(NULL, NULL, 0)], [
+#include <kdb.h>]], [[krb5_db_free_principal(NULL, NULL, 0)]])],[
     AC_MSG_RESULT(yes)
     AC_DEFINE(HAVE_KRB5_DB_FREE_PRINCIPAL_NENTRIES, [], [Use nentries arg to krb5_db_free_princip])
   ],[
@@ -357,5 +354,6 @@ for entry in ${SUBDIR}; do
 	MF="$MF ${entry}/Makefile"
 done
 
-AC_OUTPUT($MF Makefile)
+AC_CONFIG_FILES([$MF Makefile])
+AC_OUTPUT
 
