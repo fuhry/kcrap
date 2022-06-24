@@ -35,8 +35,9 @@ const char *kcrap_errmsg()
 	return _errmsg;
 }
 
-const struct kcrap_data kcrap_get_extra_data() {
-    return _extra;
+const struct kcrap_data kcrap_get_extra_data()
+{
+	return _extra;
 }
 
 struct kcrap_context *kcrap_init(char *keytab, char *service)
@@ -275,6 +276,7 @@ static int kcrap_mk_req(struct kcrap_context *context, struct sockaddr_in *to, k
 		krb5_principal princ;
 		char hostname[NI_MAXHOST + 1];
 		char hname[NI_MAXHOST + 6];
+		struct addrinfo *hostname_addrinfo;
 
 		if (again++)
 		{
@@ -289,7 +291,16 @@ static int kcrap_mk_req(struct kcrap_context *context, struct sockaddr_in *to, k
 			goto free1;
 		}
 
-		sprintf(hname, "host/%s", hostname);
+		if (getaddrinfo(hostname, "kerberos", NULL, &hostname_addrinfo) != 0)
+		{
+			retval = errno;
+			snprintf(_errmsg, ERRBUF, "%s while canonicalizing hostname", error_message(retval));
+			goto free1;
+		}
+
+		sprintf(hname, "host/%s", hostname_addrinfo->ai_canonname);
+		freeaddrinfo(hostname_addrinfo);
+
 		memset(&my_creds, 0, sizeof(my_creds));
 		if ((retval = krb5_parse_name(context->krb5_context, hname, &princ)))
 		{
