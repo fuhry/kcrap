@@ -1,0 +1,16 @@
+root = true
+[*]
+end_of_line = lf
+insert_final_newline = true
+
+[*.{c,h}]
+charset = utf-8
+indent_style = space
+indent_size = 4
+
+[configure.ac]
+indent_style = space
+indent_style = 2
+
+[Makefile{,.in}]
+indent_style = tab
