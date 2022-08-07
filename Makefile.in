@@ -15,3 +15,7 @@ distclean:
 	@(cd $@ && $(MAKE) $(TARGET))
 
 FORCE:
+
+test: lib
+
+client: lib
