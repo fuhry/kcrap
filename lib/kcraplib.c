@@ -298,7 +298,15 @@ static int kcrap_mk_req(struct kcrap_context *context, struct sockaddr_in *to, k
             goto free1;
         }
 
-        sprintf(hname, "host/%s", hostname_addrinfo->ai_canonname);
+        if (hostname_addrinfo->ai_canonname == NULL)
+        {
+            sprintf(hname, "host/%s", hostname);
+        }
+        else
+        {
+            sprintf(hname, "host/%s", hostname_addrinfo->ai_canonname);
+        }
+
         freeaddrinfo(hostname_addrinfo);
 
         memset(&my_creds, 0, sizeof(my_creds));
@@ -313,7 +321,7 @@ static int kcrap_mk_req(struct kcrap_context *context, struct sockaddr_in *to, k
         if ((retval = krb5_get_init_creds_keytab(context->krb5_context, &my_creds,
                                                  princ, NULL, 0, NULL, NULL)))
         {
-            snprintf(_errmsg, ERRBUF, "%s while getting credentials", error_message(retval));
+            snprintf(_errmsg, ERRBUF, "%s while getting credentials for princ=%s)", error_message(retval), hname);
             krb5_free_principal(context->krb5_context, princ);
             goto free1;
         }
