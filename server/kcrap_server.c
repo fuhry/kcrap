@@ -35,7 +35,26 @@ static void usage(char *name);
 
 static void usage(char *name)
 {
-    fprintf(stderr, "usage: %s [-V] [-D] [-f config_file] [-p pidfile] [-k keytab]\n", name);
+    fprintf(stderr,
+        "KCRAP: Kerberos Challenge-Response Authentication Protocol\n"
+        "  Copyright (C) 2007-2008 Jonathan Chen <kcrap+web@spock.org>\n"
+        "  Copyright (C) 2012-2022 Dan Fuhry <dan@fuhry.com>\n"
+        "\n"
+        "usage: %s [-V] [-D] [-f config_file] [-p pidfile] [-k keytab] [-x db_arg=val ...]\n"
+        "\n"
+        "Allowed arguments are:\n"
+        "\n"
+        "    -V                  Show program version and exit\n"
+        "    -D                  Run in foreground; do not daemonize\n"
+        "    -f config_file      Specify path to config file; defaults to " DEFAULT_CFG_FILE "\n"
+        "    -p pidfile          Specify path to PID file; defaults to " DEFAULT_PID_FILE "\n"
+        "    -k keytab           Specify path to system keytab; defaults to Kerberos default\n"
+        "                        (normally /etc/krb5.keytab)\n"
+        "    -x db_arg=val ...   Set database arguments. Passed directly to krb5_db_open();\n"
+        "                        see the MIT Kerberos V documentation for instructions.\n"
+        "\n"
+        "Report bugs to Dan Fuhry <dan@fuhry.com>\n\n",
+        name);
 }
 
 int main(int argc, char *argv[])
@@ -49,16 +68,13 @@ int main(int argc, char *argv[])
     krb5_keytab keytab = NULL;
     int ch;
     int nodetach = 0;
-    char *optarg;
+    char *keytab_path = NULL;
+    char *realm;
+    char **db_args = NULL;
+    int db_args_size = 0;
 
-    retval = krb5_init_context(&context);
-    if (retval)
+    while ((ch = getopt(argc, argv, "VDf:k:r:x:")) != -1)
     {
-        com_err(argv[0], retval, "while initializing krb5");
-        exit(1);
-    }
-
-    while ((ch = getopt(argc, argv, "VDf:k:")) != -1)
         switch (ch)
         {
         case 'V':
@@ -74,17 +90,32 @@ int main(int argc, char *argv[])
             pid_file = optarg;
             break;
         case 'k':
-            if ((retval = krb5_kt_resolve(context, optarg, &keytab)))
+            keytab_path = optarg;
+            break;
+        case 'r':
+            realm = strdup(optarg);
+            break;
+        case 'x':
+            db_args_size++;
             {
-                com_err(argv[0], retval, "while resolving keytab file %s", optarg);
-                exit(1);
+                char **temp = realloc(db_args, sizeof(char*) * (db_args_size+1));
+                if (temp == NULL)
+                {
+                    com_err(argv[0], errno, "while allocating memory for db_args");
+                    exit(1);
+                }
+
+                db_args = temp;
             }
+            db_args[db_args_size-1] = strdup(optarg);
+            db_args[db_args_size] = NULL;
             break;
         default:
             usage(argv[0]);
             exit(1);
             break;
         }
+    }
 
     retval = profile_init_path(cfg_file, &profile);
     if (retval)
@@ -93,13 +124,29 @@ int main(int argc, char *argv[])
         exit(1);
     }
 
+    retval = krb5_init_context_profile(profile, 0, &context);
+    if (retval)
+    {
+        com_err(argv[0], retval, "while initializing krb5");
+        exit(1);
+    }
+
+    if (keytab_path != NULL)
+    {
+        if ((retval = krb5_kt_resolve(context, keytab_path, &keytab)))
+        {
+            com_err(argv[0], retval, "while resolving keytab file %s", keytab_path);
+            exit(1);
+        }
+    }
+
     if ((retval = krb5_sname_to_principal(context, NULL, "host", KRB5_NT_SRV_HST, &sprinc)))
     {
         com_err(argv[0], retval, "while generating service name");
         exit(1);
     }
 
-    if (kcrap_open_kdb(context, profile, KCRAPSEC) != 0)
+    if (kcrap_open_kdb(context, profile, KCRAPSEC, realm, db_args) != 0)
     {
         exit(1);
     }

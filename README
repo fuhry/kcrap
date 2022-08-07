@@ -92,6 +92,15 @@ Example:
 		key_stash_file = /var/krb5kdc/EXAMPLE.COM/.k5.EXAMPLE.COM
 	}
 
+If you use another database module such as kldap, copy the [dbmodules] section
+from your kdc.conf, or just place the [kcrap_server] section into kdc.conf and
+modify your startup/init script to pass "-f" followed by the path to kdc.conf
+when starting kcrap_server.
+
+NOTE:
+    Be sure to omit the "database_name" key from your configuration file if
+	you are using kldap.
+
 IMPORTANT:
 	In order to authenticate with the NTLM family of challenge response
 	protocols, you must have NTLM password hashes stored in your

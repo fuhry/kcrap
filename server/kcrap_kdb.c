@@ -22,7 +22,6 @@
 #include "kcrap_kdb.h"
 #include "modules.h"
 
-#define DEFAULT_CFG_FILE "kcrap_server.conf"
 #define GCRSEC "kcrap_server"
 
 #ifdef HAVE_KRB5_DB_FETCH_MKEY_KVNO
@@ -33,7 +32,7 @@
 
 static krb5_keyblock master_keyblock;
 
-int kcrap_open_kdb(krb5_context context, profile_t profile, char *kcrap_section)
+int kcrap_open_kdb(krb5_context context, profile_t profile, char *kcrap_section, char *realm, char **db_args)
 {
     krb5_error_code retval;
     int nentries;
@@ -43,41 +42,74 @@ int kcrap_open_kdb(krb5_context context, profile_t profile, char *kcrap_section)
     KRB5_DB_ENTRY master_entry;
     krb5_principal master_princ;
     char *dbname;
-    char *realm = NULL;
     char *stash_file;
-#ifdef HAVE_KRB5_DB_OPEN
-    char *dbargs[2];
-#endif
 
-    retval = profile_get_string(profile, kcrap_section, "realm", NULL, NULL, &realm);
-    if (retval == 0 && realm)
+    /* realm passed in through args means it was specified on the commandline */
+    if (realm == NULL)
     {
+        /* attempt to fetch from the config file */
+        char *temp_realm;
+        retval = profile_get_string(profile, kcrap_section, "realm", NULL, NULL, &temp_realm);
+        if (retval == 0 && temp_realm != NULL)
+        {
+            realm = temp_realm;
+        }
+    }
+    if (realm != NULL)
+    {
+        /* if realm was configured, either through commandline or conf file,
+           set the default realm within the krb5 library */
         if ((retval = krb5_set_default_realm(context, realm)))
         {
             com_err("kdb_open", retval, "while setting default realm to '%s'", realm);
-            goto free0;
+            goto free1;
         }
     }
-    profile_get_string(profile, "realms", realm, "database_name", NULL, &dbname);
 
-#ifdef HAVE_KRB5_DB_OPEN
-    dbargs[0] = dbargs[1] = NULL;
-    if (dbname)
+    /* now re-get it to ensure we know the realm name and that it's normalized */
+    if ((retval = krb5_get_default_realm(context, &realm)))
     {
-        dbargs[0] = malloc(strlen(dbname) + 8);
-        strcpy(dbargs[0], "dbname=");
-        strcat(dbargs[0], dbname);
+        com_err("kdb_open", retval,
+                "while attempting to retrieve default realm");
+        goto free1;
     }
-    if ((retval = krb5_db_open(context, dbargs,
+#ifdef HAVE_KRB5_DB_OPEN
+    /* the modern way to open kdb */
+    if (db_args == NULL)
+    {
+        /* if no db_args were passed on the command line, try to get database_name
+           from the configuration file. */
+        retval = profile_get_string(profile, "realms", realm, "database_name", NULL, &dbname);
+
+        if (retval == 0 && dbname != NULL)
+        {
+            /* database_name is set in the config, so build db_args with that */
+            db_args = malloc(sizeof(char *) * 2);
+            if (db_args == NULL)
+            {
+                com_err("kdb_open", errno, "while allocating memory for db_args");
+                goto free1;
+            }
+
+            db_args[0] = NULL;
+            db_args[1] = NULL;
+            if (dbname)
+            {
+                db_args[0] = malloc(strlen(dbname) + 8);
+                strcpy(db_args[0], "dbname=");
+                strcat(db_args[0], dbname);
+            }
+        }
+    }
+    /* it's ok to fall through and pass NULL for db_args to krb5_db_open, in which
+       case it will use all defaults */
+
+    if ((retval = krb5_db_open(context, db_args,
                                KRB5_KDB_OPEN_RO | KRB5_KDB_SRV_TYPE_OTHER)))
     {
         com_err("kdb_open", retval, "while initializing database");
-        if (dbargs[0])
-            free(dbargs[0]);
         goto free1;
     }
-    if (dbargs[0])
-        free(dbargs[0]);
 #elif defined(HAVE_KRB5_DB_SET_NAME)
     if (dbname)
     {
@@ -111,14 +143,13 @@ int kcrap_open_kdb(krb5_context context, profile_t profile, char *kcrap_section)
 #endif
         com_err("open_kdb", retval, "while retrieving master entry");
         goto free2;
-#ifdef HAVE_KRB5_DB_GET_PRINCIPAL_MORE
     }
+#ifdef HAVE_KRB5_DB_GET_PRINCIPAL_MORE
     else if (more)
     {
         retval = KRB5KDC_ERR_PRINCIPAL_NOT_UNIQUE;
         com_err("open_kdb", retval, "while retrieving master entry");
         goto free3;
-#endif
     }
     else if (!nentries)
     {
@@ -126,6 +157,7 @@ int kcrap_open_kdb(krb5_context context, profile_t profile, char *kcrap_section)
         com_err("open_kdb", retval, "while retrieving master entry");
         goto free3;
     }
+#endif
 
     if ((retval = profile_get_string(profile, "realms", realm, "key_stash_file", NULL, &stash_file)))
     {
@@ -155,9 +187,16 @@ free2:
     if (retval)
         krb5_db_fini(context);
 free1:
-    profile_release_string(dbname);
-free0:
     profile_release_string(realm);
+    if (db_args != NULL)
+    {
+        for (int i = 0; db_args[i] != NULL; i++)
+        {
+            free(db_args[i]);
+        }
+
+        free(db_args);
+    }
     return retval;
 }
 
