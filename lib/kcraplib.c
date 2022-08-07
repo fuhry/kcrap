@@ -276,6 +276,9 @@ static int kcrap_mk_req(struct kcrap_context *context, struct sockaddr_in *to, k
         krb5_principal princ;
         char hostname[NI_MAXHOST + 1];
         char hname[NI_MAXHOST + 6];
+        struct addrinfo hints = {
+            .ai_flags = AI_CANONNAME,
+        };
         struct addrinfo *hostname_addrinfo;
 
         if (again++)
@@ -291,7 +294,7 @@ static int kcrap_mk_req(struct kcrap_context *context, struct sockaddr_in *to, k
             goto free1;
         }
 
-        if (getaddrinfo(hostname, "kerberos", NULL, &hostname_addrinfo) != 0)
+        if (getaddrinfo(hostname, "kerberos", &hints, &hostname_addrinfo) != 0)
         {
             retval = errno;
             snprintf(_errmsg, ERRBUF, "%s while canonicalizing hostname", error_message(retval));
