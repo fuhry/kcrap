@@ -5,31 +5,6 @@ Authors:
   Jonathan Chen <kcrap+web@spock.org>
   Dan Fuhry <dan@fuhry.com>
 
-Release Notes
-
-========================================================================
-
-
-Notes about this version
-------------------------
-
-This code works but is considered to be "proof-of-concept"-quality -
-it may or may not work for your given situation.
-
-Check the debian/patches/ directory and apply the patches in order
-(as noted in the "series" file) to bring the source up to date with
-recent Kerberos API versions and add some new features:
-
-  - The "additional response" field mandated by MSCHAP and used by
-    FreeRADIUS's mschap module to seed the session key
-  - A binary, kcrapclient, which can be used as a direct replacement
-    for Samba's ntlm_auth tool.
-
-Release 0.3.0 ensures compatibility with MIT Kerberos V 1.19. Effort
-was made to peserve compatibility with prior Kerberos versions, but
-this is untested. Moving forward as of June 2022, only the latest
-stable release of MIT Kerberos V will be tested or officially
-supported.
 
 Building and installing KCRAP
 -----------------------------
