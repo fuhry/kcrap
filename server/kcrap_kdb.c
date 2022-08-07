@@ -135,7 +135,7 @@ int kcrap_open_kdb(krb5_context context, profile_t profile, char *kcrap_section)
 
     bzero(&master_keyblock, sizeof(master_keyblock));
     master_keyblock.enctype = ENCTYPE_UNKNOWN;
-    if ((retval = krb5_db_fetch_mkey_list(context, master_princ, &master_keyblock)))
+    if ((retval = krb5_db_fetch_mkey(context, master_princ, master_keyblock.enctype, FALSE, FALSE, stash_file, KVNO_ARG_OPT 0, &master_keyblock)))
     {
         com_err("kdb_open", retval, "while verifying master key");
         krb5_free_keyblock_contents(context, &master_keyblock);
@@ -196,19 +196,19 @@ int kcrap_getkey(krb5_context context, struct kcrap_data principal, krb5_enctype
     {
 #endif
         goto free1;
-#ifdef HAVE_KRB5_DB_GET_PRINCIPAL_MORE
     }
+#ifdef HAVE_KRB5_DB_GET_PRINCIPAL_MORE
     else if (more)
     {
         retval = KRB5KDC_ERR_PRINCIPAL_NOT_UNIQUE;
         goto free2;
-#endif
     }
     else if (!nprincs)
     {
         retval = KRB5_KDB_NOENTRY;
         goto free2;
     }
+#endif
 
     if ((retval = krb5_timeofday(context, &nowtime)))
     {
