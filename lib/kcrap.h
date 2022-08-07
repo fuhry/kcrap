@@ -1,7 +1,7 @@
 #define KCRAP_AUTH_OK 0x0001
 #define KCRAP_AUTH_COOKIE_OK 0x0002
 
-#define KCRAP_VERSION "0.2.3"
+#define KCRAP_VERSION "0.4.0"
 
 struct kcrap_context;
 
